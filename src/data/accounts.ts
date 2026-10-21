@@ -9,7 +9,7 @@ import type { TransactionRecord } from '@/types/transaction';
 export const MOCK_ACCOUNTS: Account[] = [
   {
     id: 'acc-everyday',
-    name: 'Everyday Savings',
+    name: 'Everyday Account',
     maskedNumber: '•••• 2847',
     balance: 8420.55,
     currency: 'SGD',
@@ -51,5 +51,16 @@ export const MOCK_TRANSACTION_HISTORY: TransactionRecord[] = [
     completedAt: '2026-10-15T14:03:00.000Z',
     status: 'confirmed',
     reference: 'FB-20261015-0007',
+  },
+  {
+    id: 'txn-0999',
+    recipientName: 'Marcus Lee',
+    recipientBank: 'UOB',
+    recipientIdentifier: '•••• 7356',
+    amount: 18.9,
+    currency: 'SGD',
+    completedAt: '2026-10-13T19:41:00.000Z',
+    status: 'confirmed',
+    reference: 'FB-20261013-0004',
   },
 ];

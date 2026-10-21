@@ -69,6 +69,29 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 };
 
 /**
+ * Optional VISUAL theme (campaign/style skin). This is purely cosmetic: it
+ * changes colours and hero artwork only. It MUST NOT change transaction
+ * behaviour, account data, or any security decision (see ARCHITECTURE.md).
+ *
+ * `classic` is the default for the competition demo.
+ */
+export type VisualTheme = 'classic' | 'nature' | 'playful' | 'seasonal';
+
+export const VISUAL_THEME_LABELS: Record<VisualTheme, string> = {
+  classic: 'Classic Banking',
+  nature: 'Nature',
+  playful: 'Playful',
+  seasonal: 'Seasonal',
+};
+
+export const VISUAL_THEME_DESCRIPTIONS: Record<VisualTheme, string> = {
+  classic: 'Clean white, red and charcoal.',
+  nature: 'Soft greens and warm cream.',
+  playful: 'Friendly, rounded and cheerful.',
+  seasonal: 'Festive campaign accents.',
+};
+
+/**
  * The full set of explicit customer preferences.
  */
 export interface CustomerPreferences {
@@ -78,6 +101,8 @@ export interface CustomerPreferences {
   /** Ordered list; first = most important. May be empty before onboarding. */
   priorities: Priority[];
   voiceEnabled: boolean;
+  /** Cosmetic visual theme. Never affects banking logic. */
+  visualTheme: VisualTheme;
 }
 
 /**
@@ -90,4 +115,5 @@ export const DEFAULT_PREFERENCES: CustomerPreferences = {
   displayMode: 'standard',
   priorities: ['payments', 'moneyManagement', 'guidance', 'accessibility'],
   voiceEnabled: false,
+  visualTheme: 'classic',
 };

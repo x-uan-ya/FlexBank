@@ -18,7 +18,7 @@
  */
 
 import type { HomeWidget } from './home';
-import type { CustomerPreferences, DisplayMode } from './preferences';
+import type { CustomerPreferences, DisplayMode, VisualTheme } from './preferences';
 import type { InteractionMode } from './session';
 import type { Recipient } from './banking';
 
@@ -26,6 +26,7 @@ export type AppAction =
   // --- Personalisation (Dev A) ---
   | { type: 'SET_PREFERENCES'; payload: Partial<CustomerPreferences> }
   | { type: 'SET_DISPLAY_MODE'; payload: DisplayMode }
+  | { type: 'SET_VISUAL_THEME'; payload: VisualTheme }
   | { type: 'SET_HOME_LAYOUT'; payload: HomeWidget[] }
   | { type: 'COMPLETE_ONBOARDING' }
   | { type: 'RESET_PREFERENCES' }

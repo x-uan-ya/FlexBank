@@ -28,6 +28,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
       displayMode: 'standard',
       priorities: ['payments', 'moneyManagement', 'guidance', 'accessibility'],
       voiceEnabled: false,
+      visualTheme: 'classic',
     },
   },
   {
@@ -40,6 +41,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
       displayMode: 'standard',
       priorities: ['guidance', 'payments', 'moneyManagement', 'accessibility'],
       voiceEnabled: false,
+      visualTheme: 'nature',
     },
   },
   {
@@ -52,6 +54,7 @@ export const DEMO_PERSONAS: DemoPersona[] = [
       displayMode: 'highClarity',
       priorities: ['accessibility', 'guidance', 'payments', 'moneyManagement'],
       voiceEnabled: true,
+      visualTheme: 'classic',
     },
   },
 ];

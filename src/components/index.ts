@@ -18,3 +18,8 @@ export { ErrorState } from './ErrorState';
 export { EmptyState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { PlaceholderScreen } from './PlaceholderScreen';
+export { Icon, type IconName } from './Icon';
+export { SelectableCard } from './SelectableCard';
+export { Pill } from './Pill';
+export { ThemePreview } from './ThemePreview';
+export { Divider } from './Divider';

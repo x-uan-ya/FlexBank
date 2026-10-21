@@ -58,6 +58,13 @@ export function sessionReducer(
         preferences: { ...state.preferences, displayMode: action.payload },
       };
 
+    case 'SET_VISUAL_THEME':
+      // Cosmetic only — never touches transaction/account state.
+      return {
+        ...state,
+        preferences: { ...state.preferences, visualTheme: action.payload },
+      };
+
     case 'SET_HOME_LAYOUT':
       return { ...state, homeLayout: action.payload };
 

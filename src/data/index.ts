@@ -11,3 +11,11 @@ export {
   MOCK_TRANSACTION_HISTORY,
 } from './accounts';
 export { DEMO_PERSONAS, getPersona, type DemoPersona } from './personas';
+export {
+  MOCK_SPENDING,
+  MOCK_GOALS,
+  MOCK_SECURITY_TIPS,
+  type SpendingCategory,
+  type SavingsGoal,
+  type SecurityTip,
+} from './insights';

@@ -7,7 +7,7 @@
 
 export { ThemeProvider, useTheme } from './ThemeProvider';
 export { buildTheme, defaultTheme, type Theme } from './theme';
-export { colors, palette, type Colors } from './colors';
+export { colors, getColors, palette, type Colors } from './colors';
 export { radius, getSpacing, type Radius, type SpacingKey, type SpacingScale } from './spacing';
 export { shadows, type Shadows } from './shadows';
 export {

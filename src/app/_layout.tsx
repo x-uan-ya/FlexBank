@@ -36,7 +36,7 @@ function ThemedApp() {
   const preferences = usePreferences();
 
   return (
-    <ThemeProvider mode={preferences.displayMode}>
+    <ThemeProvider mode={preferences.displayMode} visualTheme={preferences.visualTheme}>
       <ErrorBoundary>
         <StatusBar style="dark" />
         <View style={{ flex: 1 }}>

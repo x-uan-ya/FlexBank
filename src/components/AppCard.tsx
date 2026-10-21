@@ -24,10 +24,12 @@ export function AppCard({
   const base: ViewStyle = {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    // High Clarity strengthens card boundaries (thicker, darker border).
+    borderWidth: theme.clarity ? 2 : 1,
+    borderColor: theme.clarity ? theme.colors.borderStrong : theme.colors.border,
     padding: padded ? theme.spacing.md : 0,
-    ...theme.shadows[elevation],
+    // Keep shadows subtle; in clarity mode rely on borders instead of shadow.
+    ...(theme.clarity ? theme.shadows.none : theme.shadows[elevation]),
   };
 
   return (
