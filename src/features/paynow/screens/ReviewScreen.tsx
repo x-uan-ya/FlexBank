@@ -11,7 +11,9 @@ import {
 import { useTheme } from '@/theme';
 import { formatMoney } from '@/utils';
 
+import { simulateOutcome } from '../outcome';
 import { usePayNow } from '../usePayNow';
+import { validateTransaction } from '../validation';
 
 /**
  * Review before confirmation (Developer B + safety-critical).
@@ -22,6 +24,8 @@ import { usePayNow } from '../usePayNow';
  *   confirms.
  * - If details changed after review, the draft is `reviewRequired` and we show
  *   a notice + block confirm until re-reviewed (principle 6).
+ * - Confirm is only enabled for a valid, review-ready draft, and we only go to
+ *   the success page when we actually asked to confirm one.
  */
 export function ReviewScreen() {
   const theme = useTheme();
@@ -31,10 +35,32 @@ export function ReviewScreen() {
 
   const needsReReview = draft.requiresReview || draft.status === 'reviewRequired';
 
+  // Only a valid draft that has reached "ready for review" may be confirmed.
+  // (Covers opening this page directly, or a draft that is not complete.)
+  const canConfirm =
+    draft.status === 'readyForReview' &&
+    !draft.requiresReview &&
+    validateTransaction(draft).valid;
+
   function confirm() {
-    // Explicit customer action. Reducer verifies the draft is review-ready.
-    paynow.confirmTransaction();
+    if (!canConfirm) {
+      return; // Never show "success" for a transfer that was not confirmable.
+    }
+
+    // The customer has pressed Confirm. Now run the SIMULATED bank outcome.
+    const outcome = simulateOutcome(draft);
+    if (!outcome.ok) {
+      paynow.failTransfer(outcome.reason);
+    } else {
+      // Explicit customer action. Reducer verifies the draft is review-ready.
+      paynow.confirmTransaction();
+    }
     router.replace('/paynow/success');
+  }
+
+  function cancel() {
+    paynow.cancelTransfer();
+    router.replace('/home');
   }
 
   return (
@@ -43,19 +69,18 @@ export function ReviewScreen() {
         <View style={{ gap: theme.spacing.sm }}>
           {/* TODO: SAFETY FEATURE — Dev D: insert a Confidence Checkpoint here
               (e.g. route to /checkpoint before confirm in guided mode). */}
+          {!canConfirm && !needsReReview ? (
+            <AppText role="caption" color="textSecondary" center>
+              Go back and complete the recipient and amount to continue.
+            </AppText>
+          ) : null}
           <AppButton
             label="Confirm and send"
             onPress={confirm}
-            disabled={needsReReview}
+            disabled={!canConfirm}
             accessibilityHint="Sends the transfer after you confirm"
           />
-          <AppButton
-            label="Cancel"
-            variant="ghost"
-            onPress={() => {
-              paynow && router.replace('/home');
-            }}
-          />
+          <AppButton label="Cancel" variant="ghost" onPress={cancel} />
         </View>
       }
     >

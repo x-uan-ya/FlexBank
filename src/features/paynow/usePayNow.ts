@@ -8,6 +8,19 @@ import type { TransactionDraft } from '@/types/transaction';
 import { validateTransaction } from './validation';
 
 /**
+ * What the PayNow screens get back from usePayNow(): the shared contract plus
+ * two extras that only PayNow screens use. They are added here (inside the
+ * PayNow folder) so the shared contract in @/types does not change.
+ */
+export type PayNowApi = PayNowContract & {
+  draft: TransactionDraft;
+  /** Customer abandons the transfer. Clears the draft. */
+  cancelTransfer(): void;
+  /** Record a simulated failure with a customer-friendly reason. */
+  failTransfer(reason: string): void;
+};
+
+/**
  * PayNow feature API (Developer B), exposed as a hook so it can dispatch typed
  * actions. Implements `PayNowContract`. Screens call these methods instead of
  * dispatching actions directly, so the PayNow state machine lives in one place.
@@ -17,7 +30,7 @@ import { validateTransaction } from './validation';
  * it. The reducer additionally refuses to confirm unless the draft is
  * review-ready and has no pending re-review.
  */
-export function usePayNow(): PayNowContract & { draft: TransactionDraft } {
+export function usePayNow(): PayNowApi {
   const dispatch = useAppDispatch();
   const draft = useTransaction();
 
@@ -42,6 +55,12 @@ export function usePayNow(): PayNowContract & { draft: TransactionDraft } {
       confirmTransaction() {
         // Explicit customer action only.
         dispatch({ type: 'CONFIRM_TRANSACTION' });
+      },
+      cancelTransfer() {
+        dispatch({ type: 'CANCEL_TRANSACTION' });
+      },
+      failTransfer(reason: string) {
+        dispatch({ type: 'FAIL_TRANSACTION', payload: { reason } });
       },
     }),
     [dispatch, draft],
