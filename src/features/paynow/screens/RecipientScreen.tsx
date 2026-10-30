@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
   AppButton,
   AppCard,
+  AppInput,
   AppText,
   EmptyState,
   Header,
@@ -13,20 +15,36 @@ import { MOCK_RECIPIENTS } from '@/data';
 import { useTheme } from '@/theme';
 import type { Recipient } from '@/types/banking';
 
+import { lookupRecipientByMobile } from '../proxyLookup';
 import { usePayNow } from '../usePayNow';
 
 /**
- * Recipient selection (Developer B). Picks a synthetic recipient and advances
- * to amount entry.
+ * Recipient selection (Developer B). The customer either taps a saved
+ * recipient or enters a PayNow mobile number. A wrong number shows a friendly
+ * message and the customer can correct it on the same screen: nothing else in
+ * the transfer draft is lost.
  */
 export function RecipientScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
 
+  const [mobile, setMobile] = useState('');
+  const [mobileError, setMobileError] = useState<string | undefined>(undefined);
+
   function choose(recipient: Recipient) {
     paynow.setRecipient(recipient);
     router.push('/paynow/amount');
+  }
+
+  function findByMobile() {
+    const result = lookupRecipientByMobile(mobile);
+    if (result.ok) {
+      setMobileError(undefined);
+      choose(result.recipient);
+    } else {
+      setMobileError(result.message);
+    }
   }
 
   return (
@@ -82,15 +100,28 @@ export function RecipientScreen() {
         </View>
       )}
 
-      {/* TODO: PAYNOW FEATURE — Dev B: add-new-recipient flow, search,
-          QR/mobile-number entry. */}
-      <AppButton
-        label="Add a new recipient"
-        variant="ghost"
-        onPress={() => {
-          /* TODO: PAYNOW FEATURE — Dev B */
-        }}
-      />
+      {/* Pay by PayNow mobile number. */}
+      <AppCard>
+        <View style={{ gap: theme.spacing.md }}>
+          <AppText role="subheading">Or pay by mobile number</AppText>
+          <AppInput
+            label="PayNow mobile number"
+            hint="8-digit Singapore mobile number"
+            value={mobile}
+            onChangeText={(text) => {
+              setMobile(text);
+              if (mobileError) setMobileError(undefined);
+            }}
+            error={mobileError}
+            keyboardType="phone-pad"
+            maxLength={14}
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={findByMobile}
+          />
+          <AppButton label="Find recipient" onPress={findByMobile} />
+        </View>
+      </AppCard>
     </ScreenContainer>
   );
 }

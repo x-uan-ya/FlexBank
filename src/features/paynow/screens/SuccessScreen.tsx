@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -12,8 +13,9 @@ import { useTheme } from '@/theme';
 import { formatMoney, makeReference } from '@/utils';
 
 /**
- * Confirmation / success (Developer B). Shows a calm success summary with a
- * synthetic reference. Reached only after an explicit confirm.
+ * Confirmation / outcome (Developer B). Shows a calm summary of what happened:
+ * sent (with a synthetic reference), failed (with a friendly reason and a way
+ * to try again), or not completed. Reached only after an explicit confirm.
  */
 export function SuccessScreen() {
   const theme = useTheme();
@@ -21,25 +23,40 @@ export function SuccessScreen() {
   const draft = useTransaction();
 
   const confirmed = draft.status === 'confirmed';
-  const reference = makeReference();
+  const failed = draft.status === 'failed';
+
+  // Create the reference once, so it does not change if the screen re-draws
+  // (for example when the customer switches display mode).
+  const [reference] = useState(() => makeReference());
+
+  const footer = failed ? (
+    <View style={{ gap: theme.spacing.sm }}>
+      <AppButton label="Try again" onPress={() => router.replace('/paynow/amount')} />
+      <AppButton
+        label="Back to home"
+        variant="ghost"
+        onPress={() => router.replace('/home')}
+      />
+    </View>
+  ) : (
+    <AppButton label="Back to home" onPress={() => router.replace('/home')} />
+  );
 
   return (
-    <ScreenContainer
-      footer={<AppButton label="Back to home" onPress={() => router.replace('/home')} />}
-    >
+    <ScreenContainer footer={footer}>
       <View style={{ alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>
         <View
           style={{
             width: 72,
             height: 72,
             borderRadius: theme.radius.pill,
-            backgroundColor: theme.colors.successSoft,
+            backgroundColor: confirmed ? theme.colors.successSoft : theme.colors.warningSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <AppText role="display" color="success">
-            ✓
+          <AppText role="display" color={confirmed ? 'success' : 'warning'}>
+            {confirmed ? '✓' : '!'}
           </AppText>
         </View>
         <AppText role="title" center>
@@ -48,7 +65,10 @@ export function SuccessScreen() {
         <AppText role="body" color="textSecondary" center>
           {confirmed
             ? 'This is a simulated confirmation. No real money moved.'
-            : 'The transfer was not confirmed.'}
+            : failed
+              ? (draft.failureReason ??
+                "We couldn't complete this transfer right now. No money was moved.")
+              : 'The transfer was not confirmed.'}
         </AppText>
       </View>
 
