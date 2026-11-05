@@ -8,6 +8,13 @@ import {
   Header,
   ScreenContainer,
 } from '@/components';
+import {
+  AdaptiveModeSwitcher,
+  GuidancePanel,
+  PAYNOW_START_CONTENT,
+  ReadabilityModeSwitcher,
+} from '@/features/adaptive';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 
 import { usePayNow } from '../usePayNow';
@@ -20,6 +27,8 @@ export function PayNowStartScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
+  const preferences = usePreferences();
+  const content = PAYNOW_START_CONTENT[preferences.guidanceLevel];
 
   function begin() {
     paynow.startTransfer();
@@ -34,16 +43,25 @@ export function PayNowStartScreen() {
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
-      <AppCard>
-        <View style={{ gap: theme.spacing.sm }}>
-          <AppText role="subheading">How it works</AppText>
-          <AppText role="body" color="textSecondary">
-            Choose who to pay, enter an amount, review the details, then confirm.
-            You will always see a summary before anything is sent. This is a
-            simulation using synthetic data.
-          </AppText>
-        </View>
-      </AppCard>
+      <AdaptiveModeSwitcher />
+      <ReadabilityModeSwitcher />
+
+      {preferences.guidanceLevel === 'guided' ? (
+        <GuidancePanel
+          title={content.title}
+          body={content.body}
+          items={content.steps}
+        />
+      ) : (
+        <AppCard>
+          <View style={{ gap: theme.spacing.sm }}>
+            <AppText role="subheading">{content.title}</AppText>
+            <AppText role="body" color="textSecondary">
+              {content.body}
+            </AppText>
+          </View>
+        </AppCard>
+      )}
 
       {/* TODO: SAFETY FEATURE — Dev D: optionally surface a confidence
           checkpoint entry here for guided mode. */}

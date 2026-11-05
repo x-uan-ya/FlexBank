@@ -10,6 +10,14 @@ import {
   Header,
   ScreenContainer,
 } from '@/components';
+import {
+  AdaptiveModeSwitcher,
+  GuidancePanel,
+  PAYNOW_AMOUNT_CONTENT,
+  ReadabilityModeSwitcher,
+  TransactionProgress,
+} from '@/features/adaptive';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 
 import { usePayNow } from '../usePayNow';
@@ -23,11 +31,18 @@ export function AmountScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
+  const preferences = usePreferences();
+  const content = PAYNOW_AMOUNT_CONTENT[preferences.guidanceLevel];
 
   const [raw, setRaw] = useState(
     paynow.draft.amount !== undefined ? String(paynow.draft.amount) : '',
   );
   const [error, setError] = useState<string | undefined>();
+
+  function choosePreset(amount: number) {
+    setRaw(String(amount));
+    setError(undefined);
+  }
 
   function next() {
     const amount = Number(raw);
@@ -51,6 +66,44 @@ export function AmountScreen() {
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
+      <AdaptiveModeSwitcher />
+      <ReadabilityModeSwitcher />
+
+      {preferences.guidanceLevel === 'guided' ? (
+        <>
+          <TransactionProgress currentStep="amount" />
+          <GuidancePanel
+            title={content.guidanceTitle!}
+            body={content.guidanceBody}
+            items={content.reminders}
+          />
+        </>
+      ) : null}
+
+      {preferences.guidanceLevel === 'quick' ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <AppText role="label">Quick amounts</AppText>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}
+          >
+            {[10, 50, 100].map((amount) => (
+              <AppButton
+                key={amount}
+                label={`S$${amount}`}
+                variant="secondary"
+                fullWidth={false}
+                accessibilityHint={`Enters ${amount} Singapore dollars`}
+                onPress={() => choosePreset(amount)}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <AppCard>
         <View style={{ gap: theme.spacing.sm }}>
           <AppInput
@@ -68,7 +121,7 @@ export function AmountScreen() {
         </View>
       </AppCard>
 
-      {/* TODO: PAYNOW FEATURE — Dev B: quick-amount chips, notes/reference. */}
+      {/* TODO: PAYNOW FEATURE — Dev B: notes/reference. */}
     </ScreenContainer>
   );
 }

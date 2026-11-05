@@ -8,6 +8,14 @@ import {
   Header,
   ScreenContainer,
 } from '@/components';
+import {
+  AdaptiveModeSwitcher,
+  GuidancePanel,
+  PAYNOW_REVIEW_CONTENT,
+  ReadabilityModeSwitcher,
+  TransactionProgress,
+} from '@/features/adaptive';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import { formatMoney } from '@/utils';
 
@@ -27,6 +35,8 @@ export function ReviewScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
+  const preferences = usePreferences();
+  const content = PAYNOW_REVIEW_CONTENT[preferences.guidanceLevel];
   const { draft } = paynow;
 
   const needsReReview = draft.requiresReview || draft.status === 'reviewRequired';
@@ -65,6 +75,9 @@ export function ReviewScreen() {
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
+      <AdaptiveModeSwitcher />
+      <ReadabilityModeSwitcher />
+
       {needsReReview ? (
         <AppCard style={{ borderColor: theme.colors.warning }}>
           <AppText role="bodyStrong" color="warning">
@@ -84,18 +97,35 @@ export function ReviewScreen() {
         </AppCard>
       ) : null}
 
+      {preferences.guidanceLevel === 'guided' ? (
+        <>
+          <TransactionProgress currentStep="review" />
+          <GuidancePanel
+            title={content.guidanceTitle!}
+            body={content.guidanceBody}
+            items={content.checklist}
+          />
+        </>
+      ) : null}
+
       <AppCard>
-        <Row label="Paying" value={draft.recipientName ?? '—'} />
+        <Row
+          label="Paying"
+          value={draft.recipientName ?? '—'}
+          compact={preferences.guidanceLevel === 'quick'}
+        />
         <Divider />
         <Row
           label="To"
           value={`${draft.recipientBank ?? ''} ${draft.recipientIdentifier ?? ''}`.trim() || '—'}
+          compact={preferences.guidanceLevel === 'quick'}
         />
         <Divider />
         <Row
           label="Amount"
           value={draft.amount !== undefined ? formatMoney(draft.amount, draft.currency) : '—'}
           emphasise
+          compact={preferences.guidanceLevel === 'quick'}
         />
       </AppCard>
 
@@ -118,26 +148,38 @@ function Row({
   label,
   value,
   emphasise,
+  compact,
 }: {
   label: string;
   value: string;
   emphasise?: boolean;
+  compact?: boolean;
 }) {
   const theme = useTheme();
+  const stacked = theme.mode !== 'standard';
   return (
     <View
       style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: theme.spacing.xs,
-        gap: theme.spacing.md,
+        flexDirection: stacked ? 'column' : 'row',
+        justifyContent: stacked ? 'flex-start' : 'space-between',
+        alignItems: stacked ? 'flex-start' : 'center',
+        paddingVertical: compact && !stacked ? 0 : theme.spacing.xs,
+        gap: stacked ? theme.spacing.xs : theme.spacing.md,
       }}
     >
       <AppText role="body" color="textSecondary">
         {label}
       </AppText>
-      <AppText role={emphasise ? 'heading' : 'bodyStrong'}>{value}</AppText>
+      <AppText
+        role={emphasise ? 'heading' : 'bodyStrong'}
+        style={{
+          flexShrink: 1,
+          textAlign: stacked ? 'left' : 'right',
+          alignSelf: stacked ? 'stretch' : 'auto',
+        }}
+      >
+        {value}
+      </AppText>
     </View>
   );
 }

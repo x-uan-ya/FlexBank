@@ -10,6 +10,14 @@ import {
   ScreenContainer,
 } from '@/components';
 import { MOCK_RECIPIENTS } from '@/data';
+import {
+  AdaptiveModeSwitcher,
+  GuidancePanel,
+  PAYNOW_RECIPIENT_CONTENT,
+  ReadabilityModeSwitcher,
+  TransactionProgress,
+} from '@/features/adaptive';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import type { Recipient } from '@/types/banking';
 
@@ -23,6 +31,8 @@ export function RecipientScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
+  const preferences = usePreferences();
+  const content = PAYNOW_RECIPIENT_CONTENT[preferences.guidanceLevel];
 
   function choose(recipient: Recipient) {
     paynow.setRecipient(recipient);
@@ -32,9 +42,23 @@ export function RecipientScreen() {
   return (
     <ScreenContainer>
       <Header
-        title="Who are you paying?"
+        title={content.heading}
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
+
+      <AdaptiveModeSwitcher />
+      <ReadabilityModeSwitcher />
+
+      {preferences.guidanceLevel === 'guided' ? (
+        <>
+          <TransactionProgress currentStep="recipient" />
+          <GuidancePanel
+            title={content.guidanceTitle!}
+            body={content.guidanceBody}
+            items={content.reminders}
+          />
+        </>
+      ) : null}
 
       {MOCK_RECIPIENTS.length === 0 ? (
         <EmptyState
@@ -57,13 +81,14 @@ export function RecipientScreen() {
                   <View
                     style={{
                       flexDirection: 'row',
-                      alignItems: 'center',
+                      flexWrap: theme.mode === 'standard' ? 'nowrap' : 'wrap',
+                      alignItems: theme.mode === 'standard' ? 'center' : 'flex-start',
                       gap: theme.spacing.md,
                       borderColor: selected ? theme.colors.accent : 'transparent',
                     }}
                   >
                     <Avatar initials={recipient.initials} />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 150 }}>
                       <AppText role="subheading">{recipient.name}</AppText>
                       <AppText role="caption" color="textSecondary">
                         {recipient.bank} {recipient.maskedIdentifier}
