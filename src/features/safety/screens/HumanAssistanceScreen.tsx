@@ -9,77 +9,133 @@ import {
   Header,
   ScreenContainer,
 } from '@/components';
+import { useAppDispatch, usePreferences, useTransaction } from '@/state';
 import { useTheme } from '@/theme';
+import {
+  DISPLAY_MODE_LABELS,
+  GUIDANCE_LABELS,
+  LANGUAGE_LABELS,
+} from '@/types/preferences';
+import type { TransactionStep } from '@/types/transaction';
 
 import { useSafety } from '../useSafety';
 
+const STEP_LABELS: Record<TransactionStep, string> = {
+  recipient: 'Choosing a recipient',
+  amount: 'Entering an amount',
+  review: 'Reviewing the transfer',
+  checkpoint: 'Reviewing the transfer',
+  confirmation: 'Transfer confirmation',
+};
+
 /**
- * Human Assistance handoff placeholder (Developer D).
+ * Human Assistance handoff (Developer D / Member 5) — SIMULATED.
  *
- * Simulates requesting a human agent. Sets `assistanceRequested` in session
- * state via the safety contract. Dev D builds the real queue / contact flow.
+ * Shows what support options would exist and exactly what non-sensitive context
+ * would be shared. It does not connect to a real agent, never cancels progress,
+ * and never confirms a transfer.
  */
 export function HumanAssistanceScreen() {
   const theme = useTheme();
   const router = useRouter();
   const safety = useSafety();
+  const dispatch = useAppDispatch();
+  const prefs = usePreferences();
+  const draft = useTransaction();
   const [requested, setRequested] = useState(false);
+
+  const hasTransfer = ['editing', 'readyForReview', 'reviewRequired'].includes(
+    draft.status,
+  );
+
+  // Only non-sensitive context: no recipient, account number or amount.
+  const sharedItems = [
+    `Where you are: ${hasTransfer ? STEP_LABELS[draft.currentStep] : 'Not in a transfer'}`,
+    `Task: ${hasTransfer ? 'PayNow transfer' : 'General help'}`,
+    `Language: ${LANGUAGE_LABELS[prefs.language]}`,
+    `Guidance level: ${GUIDANCE_LABELS[prefs.guidanceLevel]}`,
+    `Display mode: ${DISPLAY_MODE_LABELS[prefs.displayMode]}`,
+  ];
 
   function request() {
     safety.requestHumanAssistance();
     setRequested(true);
   }
 
+  function finish() {
+    if (requested) {
+      dispatch({ type: 'RESOLVE_HUMAN_ASSISTANCE' });
+    }
+    if (hasTransfer) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/paynow/review');
+      }
+    } else {
+      router.replace('/home');
+    }
+  }
+
   return (
-    <ScreenContainer>
-      <Header
-        title="Talk to a person"
-        onBack={router.canGoBack() ? () => router.back() : undefined}
-      />
+    <ScreenContainer
+      footer={
+        requested ? (
+          <AppButton
+            label={hasTransfer ? 'Return to my transfer' : 'Back to home'}
+            onPress={finish}
+          />
+        ) : (
+          <AppButton label="Request human assistance" onPress={request} />
+        )
+      }
+    >
+      <Header title="Talk to a person" onBack={finish} />
 
       <AppCard>
-        <View style={{ gap: theme.spacing.sm }}>
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              backgroundColor: theme.colors.accentSoft,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              borderRadius: theme.radius.pill,
-            }}
-          >
-            <AppText role="caption" color="accent">
-              Developer D — Safety
-            </AppText>
-          </View>
-
-          {requested ? (
-            <AppText role="body">
-              Thanks. A FlexBank specialist would be with you shortly. (Simulated
-              handoff — synthetic demo.)
-            </AppText>
-          ) : (
-            <AppText role="body" color="textSecondary">
-              If anything feels unclear, a person can help. Requesting assistance
-              never cancels your progress and never confirms a transfer for you.
-            </AppText>
-          )}
-
-          <AppText role="mono" color="textMuted">
-            {'// TODO: SAFETY FEATURE'}
+        <View style={{ gap: theme.spacing.xs }}>
+          <AppText role="bodyStrong">Simulated demo</AppText>
+          <AppText role="body" color="textSecondary">
+            This prototype does not connect to a real OCBC agent. It shows how a
+            handoff could work.
           </AppText>
         </View>
       </AppCard>
 
-      {!requested ? (
-        <AppButton label="Request human assistance" onPress={request} />
-      ) : (
-        <AppButton
-          label="Back to home"
-          variant="secondary"
-          onPress={() => router.replace('/home')}
-        />
-      )}
+      {requested ? (
+        <AppCard>
+          <View style={{ gap: theme.spacing.xs }}>
+            <AppText role="bodyStrong">Request recorded (simulated)</AppText>
+            <AppText role="body" color="textSecondary">
+              In a real service, a person would pick this up. Your transfer is
+              saved, and nothing has been sent or cancelled.
+            </AppText>
+          </View>
+        </AppCard>
+      ) : null}
+
+      <AppCard>
+        <View style={{ gap: theme.spacing.xs }}>
+          <AppText role="bodyStrong">Ways a person could help</AppText>
+          <AppText role="body" color="textSecondary">• Call support</AppText>
+          <AppText role="body" color="textSecondary">• Chat with support</AppText>
+          <AppText role="body" color="textSecondary">• Visit a branch</AppText>
+        </View>
+      </AppCard>
+
+      <AppCard>
+        <View style={{ gap: theme.spacing.xs }}>
+          <AppText role="bodyStrong">What we would share</AppText>
+          {sharedItems.map((item) => (
+            <AppText key={item} role="body" color="textSecondary">
+              • {item}
+            </AppText>
+          ))}
+          <AppText role="caption" color="textMuted">
+            No account numbers, recipient names or amounts are shared.
+          </AppText>
+        </View>
+      </AppCard>
     </ScreenContainer>
   );
 }
