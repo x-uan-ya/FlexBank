@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,9 +9,14 @@ import {
   Header,
   ScreenContainer,
 } from '@/components';
-import { useAppDispatch, useHomeLayout } from '@/state';
+import {
+  HomeRecommendationPanel,
+  applyRecommendedWidgetOrder,
+  recommendHomeExperience,
+} from '@/features/adaptive';
+import { useAppDispatch, useHomeLayout, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
-import type { HomeWidget } from '@/types/home';
+import { DEFAULT_HOME_LAYOUT, type HomeWidget } from '@/types/home';
 
 /**
  * Homepage customisation starter (Developer A).
@@ -28,8 +34,24 @@ export function CustomizeScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const layout = useHomeLayout();
+  const preferences = usePreferences();
 
   const ordered = [...layout].sort((a, b) => a.position - b.position);
+  const recommendation = useMemo(
+    () =>
+      recommendHomeExperience({
+        preferences,
+        approvedWidgetIds: DEFAULT_HOME_LAYOUT.map((widget) => widget.id),
+        existingLayout: layout,
+      }),
+    [layout, preferences],
+  );
+  const widgetLabels = Object.fromEntries(
+    DEFAULT_HOME_LAYOUT.map((widget) => [widget.id, widget.title]),
+  );
+  const layoutApplied = recommendation.widgetOrder.every(
+    (id, index) => ordered[index]?.id === id,
+  );
 
   function commit(next: HomeWidget[]) {
     const repositioned = next.map((w, position) => ({ ...w, position }));
@@ -48,6 +70,22 @@ export function CustomizeScreen() {
     commit(ordered.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w)));
   }
 
+  function applyRecommendation() {
+    dispatch({
+      type: 'SET_HOME_LAYOUT',
+      payload: applyRecommendedWidgetOrder(layout, recommendation.widgetOrder),
+    });
+  }
+
+  function applyGuidanceSuggestion() {
+    const suggestion = recommendation.guidanceSuggestion;
+    if (!suggestion) return;
+    dispatch({
+      type: 'SET_PREFERENCES',
+      payload: { guidanceLevel: suggestion.mode },
+    });
+  }
+
   return (
     <ScreenContainer
       footer={
@@ -63,6 +101,21 @@ export function CustomizeScreen() {
         subtitle="Reorder or hide widgets. You stay in control."
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
+
+      <HomeRecommendationPanel
+        recommendation={recommendation}
+        widgetLabels={widgetLabels}
+        layoutApplied={layoutApplied}
+        onApplyLayout={applyRecommendation}
+        onApplyGuidance={applyGuidanceSuggestion}
+      />
+
+      <View style={{ gap: theme.spacing.xs }}>
+        <AppText role="heading">Manual customisation</AppText>
+        <AppText role="caption" color="textSecondary">
+          You can still reorder or hide any widget yourself.
+        </AppText>
+      </View>
 
       <View style={{ gap: theme.spacing.sm }}>
         {ordered.map((widget, index) => (

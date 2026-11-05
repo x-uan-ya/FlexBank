@@ -1,5 +1,14 @@
 export { AdaptiveModeSwitcher } from './AdaptiveModeSwitcher';
 export { ReadabilityModeSwitcher } from './ReadabilityModeSwitcher';
+export { HomeRecommendationPanel } from './HomeRecommendationPanel';
+export {
+  applyRecommendedWidgetOrder,
+  recommendHomeExperience,
+  type GuidanceModeSuggestion,
+  type HomeRecommendation,
+  type HomeRecommendationInput,
+  type WidgetRecommendation,
+} from './homeRecommendations';
 export { GuidancePanel } from './GuidancePanel';
 export {
   TransactionProgress,

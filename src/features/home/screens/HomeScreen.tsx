@@ -3,8 +3,8 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppText, Icon } from '@/components';
-import { usePreferences } from '@/state';
+import { AppButton, AppText, Icon } from '@/components';
+import { useHomeLayout, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 
 import {
@@ -16,6 +16,7 @@ import {
   SpendingSection,
   TransactionsSection,
 } from '../components/HomeSections';
+import { WidgetRenderer } from '../components/WidgetRenderer';
 import { getHomeConfig, type HomeSection } from '../personalisationRules';
 
 /**
@@ -29,9 +30,15 @@ import { getHomeConfig, type HomeSection } from '../personalisationRules';
 export function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const prefs = usePreferences();
+  const homeLayout = useHomeLayout();
 
   const config = useMemo(() => getHomeConfig(prefs), [prefs]);
+  const visibleShortcuts = [...homeLayout]
+    .sort((a, b) => a.position - b.position)
+    .filter((widget) => widget.visible)
+    .slice(0, 4);
 
   const [balanceHidden, setBalanceHidden] = useState(true);
   const [category, setCategory] = useState('overview');
@@ -95,6 +102,42 @@ export function HomeScreen() {
             panel effect. */}
         <View style={{ paddingHorizontal: theme.spacing.md, gap: theme.spacing.lg }}>
           {config.sectionOrder.map(renderSection)}
+
+          <View style={{ gap: theme.spacing.sm }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: theme.spacing.sm,
+              }}
+            >
+              <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 160 }}>
+                <AppText role="heading">Your shortcuts</AppText>
+                <AppText role="caption" color="textSecondary">
+                  Ordered from your saved homepage arrangement.
+                </AppText>
+              </View>
+              <AppButton
+                label="Customise & suggestions"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => router.push('/customize')}
+              />
+            </View>
+            {visibleShortcuts.length > 0 ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                {visibleShortcuts.map((widget) => (
+                  <WidgetRenderer key={widget.id} widget={widget} />
+                ))}
+              </View>
+            ) : (
+              <AppText role="body" color="textSecondary">
+                No homepage shortcuts are currently shown. Use Customise to show one.
+              </AppText>
+            )}
+          </View>
 
           <AppText role="caption" color="textMuted" center>
             Synthetic demo data • FlexBank is not affiliated with any bank.
