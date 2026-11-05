@@ -1,4 +1,5 @@
 import { useState } from 'react';
+// Concierge help panel (Dev C) — opens in-place, does not leave this screen.
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -10,6 +11,8 @@ import {
   ScreenContainer,
 } from '@/components';
 import { useTheme } from '@/theme';
+
+import { ConciergeHelpPanel } from '@/features/concierge/components/ConciergeHelpPanel';
 
 import { usePayNow } from '../usePayNow';
 import { validateTransaction } from '../validation';
@@ -35,6 +38,7 @@ export function AmountScreen() {
     paynow.draft.amount !== undefined ? String(paynow.draft.amount) : '',
   );
   const [error, setError] = useState<string | undefined>();
+  const [showHelp, setShowHelp] = useState(false);
 
   function next() {
     const draft = paynow.draft;
@@ -92,6 +96,20 @@ export function AmountScreen() {
       </AppCard>
 
       {/* TODO: PAYNOW FEATURE — Dev B: quick-amount chips, notes/reference. */}
+
+      {showHelp ? (
+        <ConciergeHelpPanel
+          context="paynow-amount"
+          title="What amount should I enter?"
+          onClose={() => setShowHelp(false)}
+        />
+      ) : (
+        <AppButton
+          label="Explain this step"
+          variant="ghost"
+          onPress={() => setShowHelp(true)}
+        />
+      )}
     </ScreenContainer>
   );
 }

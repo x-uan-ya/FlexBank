@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   AppButton,
@@ -12,7 +12,7 @@ import {
 } from '@/components';
 import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
-import { LANGUAGE_LABELS, type Language } from '@/types/preferences';
+import type { Language } from '@/types/preferences';
 
 import { concierge } from '../concierge';
 
@@ -39,15 +39,25 @@ export function ConciergeScreen() {
   const theme = useTheme();
   const router = useRouter();
   const preferences = usePreferences();
-  const helpLanguage: Language =
-    preferences.language === 'en' ? 'zh' : preferences.language;
+  const params = useLocalSearchParams<{ context?: string }>();
 
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
-  const [originalAnswer, setOriginalAnswer] = useState<string | null>(null);
+  const [englishAnswer, setEnglishAnswer] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
   const [usedFallback, setUsedFallback] = useState(false);
-  const [originalUsedFallback, setOriginalUsedFallback] = useState(false);
+  const [displayLanguage, setDisplayLanguage] = useState<Language>('en');
+
+  // Auto-load when opened with a context query (e.g. /concierge?context=paynow-review).
+  useEffect(() => {
+    const initial = params.context;
+    if (typeof initial === 'string' && initial.length > 0) {
+      const topic = HELP_TOPICS.find((t) => t.context === initial);
+      void explainTopic(initial, topic?.label ?? 'Help for this step');
+    }
+    // Only on first mount / param change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.context]);
 
   async function explainTopic(context: string, label: string) {
     if (loading) return;
@@ -55,18 +65,39 @@ export function ConciergeScreen() {
     setLoading(true);
     setQuestion(label);
     setAnswer(null);
-    setOriginalAnswer(null);
+    setEnglishAnswer(null);
+    setDisplayLanguage('en');
 
     try {
       const response = await concierge.explain(context);
-
       setAnswer(response.text);
-      setOriginalAnswer(response.text);
+      setEnglishAnswer(response.text);
       setUsedFallback(response.usedFallback);
-      setOriginalUsedFallback(response.usedFallback);
     } catch {
       setAnswer(
         'Help is temporarily unavailable. You can go back and check your transfer details. If you are unsure, pause before confirming.',
+      );
+      setEnglishAnswer(null);
+      setUsedFallback(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function simplifyAnswer() {
+    if (loading || englishAnswer === null) return;
+
+    setLoading(true);
+
+    try {
+      const response = await concierge.simplify(englishAnswer);
+      setAnswer(response.text);
+      setEnglishAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+      setDisplayLanguage('en');
+    } catch {
+      setAnswer(
+        'Could not simplify right now. You can still use the explanation above or go back to your transfer.',
       );
       setUsedFallback(true);
     } finally {
@@ -74,46 +105,50 @@ export function ConciergeScreen() {
     }
   }
 
-  async function translateAnswer() {
-    if (loading || originalAnswer === null) return;
+  async function translateToZh() {
+    if (loading || englishAnswer === null) return;
 
     setLoading(true);
 
     try {
-      const response = await concierge.translate(
-        originalAnswer,
-        helpLanguage,
-      );
-
+      const response = await concierge.translate(englishAnswer, 'zh');
       setAnswer(response.text);
       setUsedFallback(response.usedFallback);
+      setDisplayLanguage('zh');
     } catch {
       setAnswer(
-        `${originalAnswer}\n\nTranslation is temporarily unavailable. The original English explanation is shown above.`,
+        'Could not translate right now. The English explanation is still available.',
       );
-      setUsedFallback(originalUsedFallback);
+      setUsedFallback(true);
     } finally {
       setLoading(false);
     }
   }
 
+  function readInEnglish() {
+    if (englishAnswer === null) return;
+    setAnswer(englishAnswer);
+    setDisplayLanguage('en');
+  }
+
+  // Only offer prepared Mandarin offline; do not imply Malay/Tamil work.
+  const showZhButton = displayLanguage !== 'zh';
+
   return (
     <ScreenContainer>
       <Header
-        title="Banking Concierge"
+        title="Help"
         subtitle="Help at your pace"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
       <AppCard>
         <View style={{ gap: theme.spacing.sm }}>
-          <AppText role="subheading">
-            What would you like help with?
-          </AppText>
+          <AppText role="subheading">What would you like help with?</AppText>
 
           <AppText role="body" color="textSecondary">
-            Choose a question below for a simple explanation.
-            This help does not change your transfer details or send money.
+            Choose a question below for a simple explanation. This help does not
+            change your transfer details or send money.
           </AppText>
         </View>
       </AppCard>
@@ -131,9 +166,7 @@ export function ConciergeScreen() {
         ))}
       </View>
 
-      {loading ? (
-        <LoadingState message="Preparing an explanation…" />
-      ) : null}
+      {loading ? <LoadingState message="Preparing an explanation…" /> : null}
 
       {answer !== null && !loading ? (
         <AppCard>
@@ -142,35 +175,47 @@ export function ConciergeScreen() {
 
             <AppText role="body">{answer}</AppText>
 
-            {originalAnswer !== null ? (
+            {englishAnswer !== null ? (
               <View style={{ gap: theme.spacing.sm }}>
                 <AppButton
-                  label={
-                    helpLanguage === 'zh'
-                    ? '用中文阅读'
-                    : `Read in ${LANGUAGE_LABELS[helpLanguage]}`
-                  }
+                  label="Simplify"
+                  variant="secondary"
                   onPress={() => {
-                    void translateAnswer();
+                    void simplifyAnswer();
                   }}
                 />
 
-                <AppButton
-                  label="Read in English"
-                  variant="ghost"
-                  onPress={() => {
-                    setAnswer(originalAnswer);
-                    setUsedFallback(originalUsedFallback);
-                  }}
-                />
+                {showZhButton ? (
+                  <AppButton
+                    label="用中文阅读"
+                    onPress={() => {
+                      void translateToZh();
+                    }}
+                  />
+                ) : null}
+
+                {displayLanguage !== 'en' ? (
+                  <AppButton
+                    label="Read in English"
+                    variant="ghost"
+                    onPress={readInEnglish}
+                  />
+                ) : null}
               </View>
             ) : null}
 
             <AppText role="caption" color="textMuted">
               {usedFallback
                 ? 'Prepared explanation · No AI used'
-                : 'AI-generated explanation'}
+                : 'AI-assisted explanation'}
             </AppText>
+
+            {preferences.language !== 'en' && preferences.language !== 'zh' ? (
+              <AppText role="caption" color="textMuted">
+                Prepared translations are available in English and Mandarin.
+                Other languages need the optional live AI setup.
+              </AppText>
+            ) : null}
           </View>
         </AppCard>
       ) : null}
@@ -185,4 +230,3 @@ export function ConciergeScreen() {
     </ScreenContainer>
   );
 }
-
