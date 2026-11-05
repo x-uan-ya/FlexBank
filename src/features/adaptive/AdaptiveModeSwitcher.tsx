@@ -28,7 +28,7 @@ interface AdaptiveModeSwitcherProps {
  * Temporary safety/assistance state (`interactionMode`) remains independent.
  */
 export function AdaptiveModeSwitcher({
-  title = 'Experience mode',
+  title = 'Banking pace',
 }: AdaptiveModeSwitcherProps) {
   const theme = useTheme();
   const preferences = usePreferences();
@@ -45,12 +45,7 @@ export function AdaptiveModeSwitcher({
   return (
     <AppCard elevation="none">
       <View style={{ gap: theme.spacing.sm }}>
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText role="label">{title}</AppText>
-          <AppText role="caption" color="textSecondary">
-            Change the amount of guidance without leaving this transfer.
-          </AppText>
-        </View>
+        <AppText role="label">{title}</AppText>
 
         <View
           accessibilityLabel="Experience mode"

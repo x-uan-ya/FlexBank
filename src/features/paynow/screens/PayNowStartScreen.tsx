@@ -39,7 +39,7 @@ export function PayNowStartScreen() {
     <ScreenContainer footer={<AppButton label="Start a PayNow transfer" onPress={begin} />}>
       <Header
         title="PayNow"
-        subtitle="Send money instantly (simulated)"
+        subtitle="A clear, simulated transfer journey"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
@@ -62,6 +62,15 @@ export function PayNowStartScreen() {
           </View>
         </AppCard>
       )}
+
+      <AppCard elevation="none" style={{ backgroundColor: theme.colors.surfaceMuted }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+          <AppText role="bodyStrong" color="primary">✓</AppText>
+          <AppText role="caption" color="textSecondary" style={{ flex: 1 }}>
+            You will review the recipient and amount before confirming. No real money moves.
+          </AppText>
+        </View>
+      </AppCard>
 
       {/* TODO: SAFETY FEATURE — Dev D: optionally surface a confidence
           checkpoint entry here for guided mode. */}

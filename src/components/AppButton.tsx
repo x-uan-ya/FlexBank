@@ -44,13 +44,14 @@ export function AppButton({
     backgroundColor: isDisabled ? theme.colors.disabled : v.bg,
     borderColor: v.border ?? 'transparent',
     borderWidth: v.border ? 1 : 0,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: fullWidth ? 'stretch' : 'flex-start',
     minHeight: 48,
+    ...(variant === 'primary' && !isDisabled ? theme.shadows.sm : null),
   };
 
   const labelColor = isDisabled ? theme.colors.onDisabled : v.fg;

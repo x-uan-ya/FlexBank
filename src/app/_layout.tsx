@@ -40,12 +40,14 @@ function ThemedApp() {
       <ErrorBoundary>
         <StatusBar style="dark" />
         <View style={{ flex: 1 }}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: 'transparent' },
-            }}
-          />
+          <View style={{ flex: 1, minHeight: 0 }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
+            />
+          </View>
           {/* Dev-only persona switcher; renders nothing in production. */}
           <DemoBar />
         </View>

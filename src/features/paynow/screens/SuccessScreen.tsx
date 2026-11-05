@@ -35,13 +35,13 @@ export function SuccessScreen() {
 
   return (
     <ScreenContainer
-      footer={<AppButton label="Back to home" onPress={() => router.replace('/home')} />}
+      footer={<AppButton label="Done — back to home" onPress={() => router.replace('/home')} />}
     >
       <View style={{ alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>
         <View
           style={{
-            width: 72,
-            height: 72,
+            width: theme.mode === 'standard' ? 72 : 84,
+            height: theme.mode === 'standard' ? 72 : 84,
             borderRadius: theme.radius.pill,
             backgroundColor: theme.colors.successSoft,
             alignItems: 'center',
@@ -65,23 +65,26 @@ export function SuccessScreen() {
       <AdaptiveModeSwitcher />
       <ReadabilityModeSwitcher />
 
+      {confirmed ? <TransactionProgress currentStep="complete" /> : null}
+
       {confirmed && preferences.guidanceLevel === 'guided' ? (
-        <>
-          <TransactionProgress currentStep="complete" />
-          <GuidancePanel
-            title="What happens next?"
-            items={content.nextSteps}
-          />
-        </>
+        <GuidancePanel
+          title="What happens next?"
+          items={content.nextSteps}
+        />
       ) : null}
 
       {confirmed ? (
         <AppCard>
+          <AppText role="subheading">Transfer receipt</AppText>
+          <View style={{ height: theme.spacing.sm }} />
           <Row label="Paid" value={draft.recipientName ?? '—'} />
+          <Divider />
           <Row
             label="Amount"
             value={draft.amount !== undefined ? formatMoney(draft.amount, draft.currency) : '—'}
           />
+          <Divider />
           <Row label="Reference" value={reference} />
         </AppCard>
       ) : null}
@@ -90,6 +93,11 @@ export function SuccessScreen() {
           if the transfer failed. */}
     </ScreenContainer>
   );
+}
+
+function Divider() {
+  const theme = useTheme();
+  return <View style={{ height: 1, backgroundColor: theme.colors.border }} />;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

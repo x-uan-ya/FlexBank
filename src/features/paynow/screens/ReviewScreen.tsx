@@ -6,6 +6,7 @@ import {
   AppCard,
   AppText,
   Header,
+  Icon,
   ScreenContainer,
 } from '@/components';
 import {
@@ -60,23 +61,43 @@ export function ReviewScreen() {
             accessibilityHint="Sends the transfer after you confirm"
           />
           <AppButton
-            label="Cancel"
-            variant="ghost"
-            onPress={() => {
-              paynow && router.replace('/home');
-            }}
+            label="Edit details"
+            variant="secondary"
+            onPress={() => router.back()}
+            accessibilityHint="Returns to edit the transfer without clearing it"
           />
         </View>
       }
     >
       <Header
-        title="Review"
+        title="Review transfer"
         subtitle="Check the details before you confirm"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
       <AdaptiveModeSwitcher />
       <ReadabilityModeSwitcher />
+
+      <TransactionProgress currentStep="review" />
+
+      <AppCard elevation="none" style={{ backgroundColor: theme.colors.surfaceMuted }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
+          <Icon
+            name="shield"
+            size={22}
+            circle
+            circleSize={44}
+            color={theme.colors.primary}
+            circleColor={theme.colors.accentSoft}
+          />
+          <View style={{ flex: 1, gap: theme.spacing.xs }}>
+            <AppText role="subheading">Check details before sending</AppText>
+            <AppText role="caption" color="textSecondary">
+              Make sure the recipient, destination and amount match what you intend.
+            </AppText>
+          </View>
+        </View>
+      </AppCard>
 
       {needsReReview ? (
         <AppCard style={{ borderColor: theme.colors.warning }}>
@@ -98,30 +119,30 @@ export function ReviewScreen() {
       ) : null}
 
       {preferences.guidanceLevel === 'guided' ? (
-        <>
-          <TransactionProgress currentStep="review" />
-          <GuidancePanel
-            title={content.guidanceTitle!}
-            body={content.guidanceBody}
-            items={content.checklist}
-          />
-        </>
+        <GuidancePanel
+          title={content.guidanceTitle!}
+          body={content.guidanceBody}
+          items={content.checklist}
+        />
       ) : null}
 
       <AppCard>
         <Row
-          label="Paying"
+          icon="profile"
+          label="Recipient"
           value={draft.recipientName ?? '—'}
           compact={preferences.guidanceLevel === 'quick'}
         />
         <Divider />
         <Row
-          label="To"
+          icon="cards"
+          label="Destination"
           value={`${draft.recipientBank ?? ''} ${draft.recipientIdentifier ?? ''}`.trim() || '—'}
           compact={preferences.guidanceLevel === 'quick'}
         />
         <Divider />
         <Row
+          icon="insights"
           label="Amount"
           value={draft.amount !== undefined ? formatMoney(draft.amount, draft.currency) : '—'}
           emphasise
@@ -129,13 +150,30 @@ export function ReviewScreen() {
         />
       </AppCard>
 
+      <AppCard
+        elevation="none"
+        style={{
+          backgroundColor: theme.colors.warningSoft,
+          borderColor: theme.colors.warning,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+          <Icon name="info" size={20} color={theme.colors.warning} />
+          <AppText role="caption" color="textSecondary" style={{ flex: 1 }}>
+            Once confirmed, this simulated transfer is treated as complete. Check everything now.
+          </AppText>
+        </View>
+      </AppCard>
+
       {/* TODO: CONCIERGE FEATURE — Dev C: add an "Explain this" affordance that
           calls concierge.explain('paynow-review'). */}
-      <AppButton
-        label="Explain this screen"
-        variant="ghost"
-        onPress={() => router.push('/concierge')}
-      />
+      {preferences.guidanceLevel === 'guided' ? (
+        <AppButton
+          label="Explain this screen"
+          variant="ghost"
+          onPress={() => router.push('/concierge')}
+        />
+      ) : null}
 
       <AppText role="caption" color="textMuted" center>
         No real money moves. Synthetic demo data only.
@@ -145,11 +183,13 @@ export function ReviewScreen() {
 }
 
 function Row({
+  icon,
   label,
   value,
   emphasise,
   compact,
 }: {
+  icon: Parameters<typeof Icon>[0]['name'];
   label: string;
   value: string;
   emphasise?: boolean;
@@ -167,9 +207,10 @@ function Row({
         gap: stacked ? theme.spacing.xs : theme.spacing.md,
       }}
     >
-      <AppText role="body" color="textSecondary">
-        {label}
-      </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <Icon name={icon} size={20} color={theme.colors.primary} />
+        <AppText role="body" color="textSecondary">{label}</AppText>
+      </View>
       <AppText
         role={emphasise ? 'heading' : 'bodyStrong'}
         style={{

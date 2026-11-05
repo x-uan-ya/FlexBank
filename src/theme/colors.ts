@@ -37,6 +37,8 @@ const status = {
   warningSoft: '#FBF1D6',
   danger: '#C0392B',
   dangerSoft: '#FADBD8',
+  guidance: '#6741B7',
+  guidanceSoft: '#F2EAFE',
 } as const;
 
 /**
@@ -70,6 +72,8 @@ export interface Colors {
   warningSoft: string;
   danger: string;
   dangerSoft: string;
+  guidance: string;
+  guidanceSoft: string;
 
   focusRing: string;
   disabled: string;
@@ -103,16 +107,16 @@ interface ThemeBrand {
 const THEME_BRANDS: Record<VisualTheme, ThemeBrand> = {
   // Classic Banking — premium white + banking red + charcoal (demo default).
   classic: {
-    background: '#F7F8FA',
-    surfaceMuted: '#F1F3F6',
-    primary: '#C8102E',
-    primaryStrong: '#A00C24',
-    accent: '#C8102E',
-    accentSoft: '#FBE4E7',
-    hero: '#C8102E',
-    heroDeep: '#8E0A20',
+    background: '#FCF8F5',
+    surfaceMuted: '#F7F0EC',
+    primary: '#BE1236',
+    primaryStrong: '#940B29',
+    accent: '#BE1236',
+    accentSoft: '#FBE5EA',
+    hero: '#BE1236',
+    heroDeep: '#8D0A27',
     onHero: '#FFFFFF',
-    heroArtTint: '#F4A9B4',
+    heroArtTint: '#F7BCC7',
   },
   // Nature — soft greens and warm cream.
   nature: {

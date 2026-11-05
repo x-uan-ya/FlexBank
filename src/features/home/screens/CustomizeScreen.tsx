@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -17,6 +17,7 @@ import {
 import { useAppDispatch, useHomeLayout, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import { DEFAULT_HOME_LAYOUT, type HomeWidget } from '@/types/home';
+import { PRIORITY_LABELS } from '@/types/preferences';
 
 /**
  * Homepage customisation starter (Developer A).
@@ -35,6 +36,7 @@ export function CustomizeScreen() {
   const dispatch = useAppDispatch();
   const layout = useHomeLayout();
   const preferences = usePreferences();
+  const [manualOpen, setManualOpen] = useState(false);
 
   const ordered = [...layout].sort((a, b) => a.position - b.position);
   const recommendation = useMemo(
@@ -97,10 +99,40 @@ export function CustomizeScreen() {
       }
     >
       <Header
-        title="Customise homepage"
-        subtitle="Reorder or hide widgets. You stay in control."
+        title="Made for you"
+        subtitle="Suggestions based only on the choices you made."
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
+
+      <View style={{ gap: theme.spacing.sm }}>
+        <AppText role="heading">Your priorities</AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+          {preferences.priorities.map((priority) => (
+            <View
+              key={priority}
+              style={{
+                minHeight: 44,
+                justifyContent: 'center',
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+                borderRadius: theme.radius.pill,
+                backgroundColor: theme.colors.selectedBg,
+                borderWidth: theme.clarity ? 2 : 1,
+                borderColor: theme.colors.selectedBorder,
+              }}
+            >
+              <AppText role="label" color="primary">
+                ✓ {PRIORITY_LABELS[priority]}
+              </AppText>
+            </View>
+          ))}
+        </View>
+        <AppButton
+          label="Change priorities in Settings"
+          variant="ghost"
+          onPress={() => router.push('/settings')}
+        />
+      </View>
 
       <HomeRecommendationPanel
         recommendation={recommendation}
@@ -110,24 +142,34 @@ export function CustomizeScreen() {
         onApplyGuidance={applyGuidanceSuggestion}
       />
 
-      <View style={{ gap: theme.spacing.xs }}>
-        <AppText role="heading">Manual customisation</AppText>
-        <AppText role="caption" color="textSecondary">
-          You can still reorder or hide any widget yourself.
-        </AppText>
-      </View>
+      <AppCard elevation="none">
+        <View style={{ gap: theme.spacing.sm }}>
+          <AppText role="heading">Manual customisation</AppText>
+          <AppText role="caption" color="textSecondary">
+            Reorder or hide widgets yourself. Your choices remain in control.
+          </AppText>
+          <AppButton
+            label={manualOpen ? 'Hide manual controls' : 'Open manual controls'}
+            variant="secondary"
+            onPress={() => setManualOpen((open) => !open)}
+            accessibilityState={{ expanded: manualOpen }}
+          />
+        </View>
+      </AppCard>
 
-      <View style={{ gap: theme.spacing.sm }}>
-        {ordered.map((widget, index) => (
+      {manualOpen ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          {ordered.map((widget, index) => (
           <AppCard key={widget.id}>
             <View
               style={{
                 flexDirection: 'row',
+                flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: theme.spacing.sm,
               }}
             >
-              <View style={{ flex: 1 }}>
+              <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 140 }}>
                 <AppText role="subheading">{widget.title}</AppText>
                 <AppText role="caption" color="textMuted">
                   {widget.visible ? 'Shown' : 'Hidden'}
@@ -156,8 +198,9 @@ export function CustomizeScreen() {
               />
             </View>
           </AppCard>
-        ))}
-      </View>
+          ))}
+        </View>
+      ) : null}
 
       {/* TODO: PERSONALISATION FEATURE — Dev A: drag-and-drop reorder,
           preview, per-widget settings. */}

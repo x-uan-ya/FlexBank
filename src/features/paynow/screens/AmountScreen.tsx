@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -61,7 +61,7 @@ export function AmountScreen() {
   return (
     <ScreenContainer footer={<AppButton label="Review transfer" onPress={next} />}>
       <Header
-        title="How much?"
+        title="PayNow"
         subtitle={paynow.draft.recipientName ? `Paying ${paynow.draft.recipientName}` : undefined}
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
@@ -69,15 +69,26 @@ export function AmountScreen() {
       <AdaptiveModeSwitcher />
       <ReadabilityModeSwitcher />
 
+      <TransactionProgress currentStep="amount" />
+
       {preferences.guidanceLevel === 'guided' ? (
-        <>
-          <TransactionProgress currentStep="amount" />
-          <GuidancePanel
-            title={content.guidanceTitle!}
-            body={content.guidanceBody}
-            items={content.reminders}
-          />
-        </>
+        <GuidancePanel
+          title={content.guidanceTitle!}
+          body={content.guidanceBody}
+          items={content.reminders}
+        />
+      ) : null}
+
+      {paynow.draft.recipientName ? (
+        <AppCard elevation="none">
+          <View style={{ gap: theme.spacing.xs }}>
+            <AppText role="caption" color="textSecondary">Recipient</AppText>
+            <AppText role="bodyStrong">{paynow.draft.recipientName}</AppText>
+            <AppText role="caption" color="textMuted">
+              {paynow.draft.recipientBank} {paynow.draft.recipientIdentifier}
+            </AppText>
+          </View>
+        </AppCard>
       ) : null}
 
       {preferences.guidanceLevel === 'quick' ? (
@@ -90,16 +101,36 @@ export function AmountScreen() {
               gap: theme.spacing.sm,
             }}
           >
-            {[10, 50, 100].map((amount) => (
-              <AppButton
+            {[10, 50, 100].map((amount) => {
+              const selected = raw === String(amount);
+              return (
+              <Pressable
                 key={amount}
-                label={`S$${amount}`}
-                variant="secondary"
-                fullWidth={false}
+                accessibilityRole="button"
+                accessibilityLabel={`${amount} Singapore dollars`}
                 accessibilityHint={`Enters ${amount} Singapore dollars`}
+                accessibilityState={{ selected }}
                 onPress={() => choosePreset(amount)}
-              />
-            ))}
+                style={({ pressed }) => ({
+                  minHeight: 48,
+                  flexGrow: 1,
+                  flexBasis: 88,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: theme.spacing.md,
+                  borderRadius: theme.radius.lg,
+                  borderWidth: selected || theme.clarity ? 2 : 1,
+                  borderColor: selected ? theme.colors.selectedBorder : theme.colors.border,
+                  backgroundColor: selected ? theme.colors.selectedBg : theme.colors.surface,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <AppText role="label" color={selected ? 'primary' : 'textPrimary'}>
+                  {selected ? '✓ ' : ''}S${amount}
+                </AppText>
+              </Pressable>
+              );
+            })}
           </View>
         </View>
       ) : null}
@@ -117,6 +148,7 @@ export function AmountScreen() {
             }}
             error={error}
             hint="Synthetic demo — no real money moves."
+            style={{ ...theme.typography.heading, minHeight: 64 }}
           />
         </View>
       </AppCard>

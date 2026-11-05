@@ -14,7 +14,13 @@ export function GuidancePanel({ title, body, items = [] }: GuidancePanelProps) {
   const theme = useTheme();
 
   return (
-    <AppCard elevation="none" style={{ borderColor: theme.colors.accent }}>
+    <AppCard
+      elevation="none"
+      style={{
+        backgroundColor: theme.colors.guidanceSoft,
+        borderColor: theme.colors.guidance,
+      }}
+    >
       <View style={{ gap: theme.spacing.sm }}>
         <AppText role="subheading">{title}</AppText>
         {body ? (
@@ -39,12 +45,12 @@ export function GuidancePanel({ title, body, items = [] }: GuidancePanelProps) {
                     minHeight: theme.mode === 'standard' ? 24 : 32,
                     paddingHorizontal: theme.spacing.xs,
                     borderRadius: theme.radius.pill,
-                    backgroundColor: theme.colors.accentSoft,
+                    backgroundColor: theme.colors.surface,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <AppText role="caption" color="accent">
+                  <AppText role="caption" color="guidance">
                     {index + 1}
                   </AppText>
                 </View>

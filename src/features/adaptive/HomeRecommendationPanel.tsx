@@ -48,14 +48,14 @@ export function HomeRecommendationPanel({
     <AppCard elevation="none" style={{ borderColor: theme.colors.accent }}>
       <View style={{ gap: theme.spacing.md }}>
         <View style={{ gap: theme.spacing.xs }}>
-          <AppText role="heading">Suggested homepage arrangement</AppText>
+          <AppText role="heading">Suggested widget arrangement</AppText>
           <AppText role="body" color="textSecondary">
             Based only on the priorities and modes you selected. Review it before applying.
           </AppText>
         </View>
 
         <View style={{ gap: theme.spacing.sm }}>
-          {recommendation.widgets.map((widget, index) => (
+          {recommendation.widgets.slice(0, 4).map((widget, index) => (
             <View
               key={widget.widgetId}
               style={{
@@ -89,6 +89,11 @@ export function HomeRecommendationPanel({
               </View>
             </View>
           ))}
+          {recommendation.widgets.length > 4 ? (
+            <AppText role="caption" color="textSecondary">
+              {recommendation.widgets.length - 4} more widgets stay available in the recommended order.
+            </AppText>
+          ) : null}
         </View>
 
         <AppButton
@@ -117,7 +122,7 @@ export function HomeRecommendationPanel({
         ) : null}
 
         <AppButton
-          label="Dismiss suggestions"
+          label="Maybe later"
           variant="ghost"
           onPress={() => setDismissed(true)}
         />

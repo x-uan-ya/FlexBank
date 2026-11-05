@@ -2,11 +2,11 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
-  AppButton,
   AppCard,
   AppText,
   EmptyState,
   Header,
+  Icon,
   ScreenContainer,
 } from '@/components';
 import { MOCK_RECIPIENTS } from '@/data';
@@ -42,23 +42,30 @@ export function RecipientScreen() {
   return (
     <ScreenContainer>
       <Header
-        title={content.heading}
+        title="PayNow"
+        subtitle={content.heading}
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
       <AdaptiveModeSwitcher />
       <ReadabilityModeSwitcher />
 
+      <TransactionProgress currentStep="recipient" />
+
       {preferences.guidanceLevel === 'guided' ? (
-        <>
-          <TransactionProgress currentStep="recipient" />
-          <GuidancePanel
-            title={content.guidanceTitle!}
-            body={content.guidanceBody}
-            items={content.reminders}
-          />
-        </>
+        <GuidancePanel
+          title={content.guidanceTitle!}
+          body={content.guidanceBody}
+          items={content.reminders}
+        />
       ) : null}
+
+      <View style={{ gap: theme.spacing.xs }}>
+        <AppText role="heading">Saved recipients</AppText>
+        <AppText role="caption" color="textSecondary">
+          Select a recipient to continue. Check the name and masked destination.
+        </AppText>
+      </View>
 
       {MOCK_RECIPIENTS.length === 0 ? (
         <EmptyState
@@ -77,7 +84,16 @@ export function RecipientScreen() {
                 onPress={() => choose(recipient)}
                 style={({ pressed }) => (pressed ? { opacity: 0.9 } : null)}
               >
-                <AppCard>
+                <AppCard
+                  style={
+                    selected
+                      ? {
+                          borderColor: theme.colors.selectedBorder,
+                          backgroundColor: theme.colors.selectedBg,
+                        }
+                      : undefined
+                  }
+                >
                   <View
                     style={{
                       flexDirection: 'row',
@@ -96,9 +112,11 @@ export function RecipientScreen() {
                     </View>
                     {selected ? (
                       <AppText role="label" color="accent">
-                        Selected
+                        ✓ Selected
                       </AppText>
-                    ) : null}
+                    ) : (
+                      <Icon name="chevron" size={18} color={theme.colors.textMuted} />
+                    )}
                   </View>
                 </AppCard>
               </Pressable>
@@ -107,15 +125,9 @@ export function RecipientScreen() {
         </View>
       )}
 
-      {/* TODO: PAYNOW FEATURE — Dev B: add-new-recipient flow, search,
-          QR/mobile-number entry. */}
-      <AppButton
-        label="Add a new recipient"
-        variant="ghost"
-        onPress={() => {
-          /* TODO: PAYNOW FEATURE — Dev B */
-        }}
-      />
+      <AppText role="caption" color="textMuted" center>
+        Adding a new recipient is not available in this prototype.
+      </AppText>
     </ScreenContainer>
   );
 }
