@@ -10,85 +10,179 @@ import {
   LoadingState,
   ScreenContainer,
 } from '@/components';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
+import { LANGUAGE_LABELS, type Language } from '@/types/preferences';
 
 import { concierge } from '../concierge';
 
-/**
- * AI Banking Concierge placeholder (Developer C).
- *
- * Works today using the DETERMINISTIC FALLBACK (no AI wired in). This proves the
- * integration point: the screen calls the `ConciergeContract` and shows whether
- * the response came from the fallback. Dev C swaps in a real provider behind the
- * same contract and keeps the fallback path.
- */
+const HELP_TOPICS = [
+  {
+    context: 'paynow-recipient',
+    label: 'Who am I sending money to?',
+  },
+  {
+    context: 'paynow-amount',
+    label: 'What amount should I enter?',
+  },
+  {
+    context: 'paynow-review',
+    label: 'What should I check before confirming?',
+  },
+  {
+    context: 'paynow-proxy',
+    label: 'What does “PayNow proxy” mean?',
+  },
+];
+
 export function ConciergeScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const preferences = usePreferences();
+  const helpLanguage: Language =
+    preferences.language === 'en' ? 'zh' : preferences.language;
 
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [originalAnswer, setOriginalAnswer] = useState<string | null>(null);
+  const [question, setQuestion] = useState('');
   const [usedFallback, setUsedFallback] = useState(false);
+  const [originalUsedFallback, setOriginalUsedFallback] = useState(false);
 
-  async function explainReview() {
+  async function explainTopic(context: string, label: string) {
+    if (loading) return;
+
     setLoading(true);
-    const res = await concierge.explain('paynow-review');
-    setAnswer(res.text);
-    setUsedFallback(res.usedFallback);
-    setLoading(false);
+    setQuestion(label);
+    setAnswer(null);
+    setOriginalAnswer(null);
+
+    try {
+      const response = await concierge.explain(context);
+
+      setAnswer(response.text);
+      setOriginalAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+      setOriginalUsedFallback(response.usedFallback);
+    } catch {
+      setAnswer(
+        'Help is temporarily unavailable. You can go back and check your transfer details. If you are unsure, pause before confirming.',
+      );
+      setUsedFallback(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function translateAnswer() {
+    if (loading || originalAnswer === null) return;
+
+    setLoading(true);
+
+    try {
+      const response = await concierge.translate(
+        originalAnswer,
+        helpLanguage,
+      );
+
+      setAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+    } catch {
+      setAnswer(
+        `${originalAnswer}\n\nTranslation is temporarily unavailable. The original English explanation is shown above.`,
+      );
+      setUsedFallback(originalUsedFallback);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <ScreenContainer>
       <Header
         title="Banking Concierge"
-        subtitle="Plain-language help"
+        subtitle="Help at your pace"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
       <AppCard>
         <View style={{ gap: theme.spacing.sm }}>
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              backgroundColor: theme.colors.accentSoft,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              borderRadius: theme.radius.pill,
-            }}
-          >
-            <AppText role="caption" color="accent">
-              Developer C — Concierge
-            </AppText>
-          </View>
-          <AppText role="body" color="textSecondary">
-            This screen is a starting point. It uses a deterministic fallback so
-            the app works without AI. Wire a real provider behind the same
-            contract: concierge.explain / simplify / translate.
+          <AppText role="subheading">
+            What would you like help with?
           </AppText>
-          <AppText role="mono" color="textMuted">
-            {'// TODO: CONCIERGE FEATURE'}
+
+          <AppText role="body" color="textSecondary">
+            Choose a question below for a simple explanation.
+            This help does not change your transfer details or send money.
           </AppText>
         </View>
       </AppCard>
 
-      <AppButton label="Explain the review screen" onPress={explainReview} />
+      <View style={{ gap: theme.spacing.sm }}>
+        {HELP_TOPICS.map((topic) => (
+          <AppButton
+            key={topic.context}
+            label={topic.label}
+            disabled={loading}
+            onPress={() => {
+              void explainTopic(topic.context, topic.label);
+            }}
+          />
+        ))}
+      </View>
 
-      {loading ? <LoadingState message="Preparing an explanation…" /> : null}
+      {loading ? (
+        <LoadingState message="Preparing an explanation…" />
+      ) : null}
 
-      {answer && !loading ? (
+      {answer !== null && !loading ? (
         <AppCard>
-          <View style={{ gap: theme.spacing.xs }}>
-            <AppText role="subheading">Explanation</AppText>
+          <View style={{ gap: theme.spacing.sm }}>
+            <AppText role="subheading">{question}</AppText>
+
             <AppText role="body">{answer}</AppText>
-            {usedFallback ? (
-              <AppText role="caption" color="textMuted">
-                Offline explanation (no AI used).
-              </AppText>
+
+            {originalAnswer !== null ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                <AppButton
+                  label={
+                    helpLanguage === 'zh'
+                    ? '用中文阅读'
+                    : `Read in ${LANGUAGE_LABELS[helpLanguage]}`
+                  }
+                  onPress={() => {
+                    void translateAnswer();
+                  }}
+                />
+
+                <AppButton
+                  label="Read in English"
+                  variant="ghost"
+                  onPress={() => {
+                    setAnswer(originalAnswer);
+                    setUsedFallback(originalUsedFallback);
+                  }}
+                />
+              </View>
             ) : null}
+
+            <AppText role="caption" color="textMuted">
+              {usedFallback
+                ? 'Prepared explanation · No AI used'
+                : 'AI-generated explanation'}
+            </AppText>
           </View>
         </AppCard>
+      ) : null}
+
+      {router.canGoBack() ? (
+        <AppButton
+          label="Go back"
+          variant="ghost"
+          onPress={() => router.back()}
+        />
       ) : null}
     </ScreenContainer>
   );
 }
+
