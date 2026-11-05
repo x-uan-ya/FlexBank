@@ -18,6 +18,7 @@ import {
 import { usePreferences, useTransaction } from '@/state';
 import { useTheme } from '@/theme';
 import { formatMoney, makeReference } from '@/utils';
+import { canShowSuccessfulReceipt, validateTransaction } from '../validation';
 
 /**
  * Confirmation / success (Developer B). Shows a calm success summary with a
@@ -30,12 +31,31 @@ export function SuccessScreen() {
   const preferences = usePreferences();
   const content = PAYNOW_SUCCESS_CONTENT[preferences.guidanceLevel];
 
-  const confirmed = draft.status === 'confirmed';
+  const confirmed = canShowSuccessfulReceipt(draft);
+  const failed = draft.status === 'failed' && validateTransaction(draft).valid;
   const [reference] = useState(() => makeReference());
 
   return (
     <ScreenContainer
-      footer={<AppButton label="Done — back to home" onPress={() => router.replace('/home')} />}
+      footer={
+        <View style={{ gap: theme.spacing.sm }}>
+          {failed ? (
+            <>
+              <AppButton
+                label="Edit details and try again"
+                onPress={() => router.replace('/paynow/amount')}
+                accessibilityHint="Returns to edit the saved amount before reviewing again"
+              />
+              <AppButton label="Ask for help" variant="secondary" onPress={() => router.push('/human-assistance')} />
+            </>
+          ) : null}
+          <AppButton
+            label="Done — back to home"
+            variant={failed ? 'ghost' : 'primary'}
+            onPress={() => router.replace('/home')}
+          />
+        </View>
+      }
     >
       <View style={{ alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>
         <View
@@ -43,22 +63,24 @@ export function SuccessScreen() {
             width: theme.mode === 'standard' ? 72 : 84,
             height: theme.mode === 'standard' ? 72 : 84,
             borderRadius: theme.radius.pill,
-            backgroundColor: theme.colors.successSoft,
+            backgroundColor: confirmed ? theme.colors.successSoft : failed ? theme.colors.dangerSoft : theme.colors.warningSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <AppText role="display" color="success">
-            ✓
+          <AppText role="display" color={confirmed ? 'success' : failed ? 'danger' : 'warning'}>
+            {confirmed ? '✓' : '!'}
           </AppText>
         </View>
         <AppText role="title" center>
-          {confirmed ? content.title : 'Transfer not completed'}
+          {confirmed ? content.title : failed ? content.failedTitle : 'Transfer not completed'}
         </AppText>
-        <AppText role="body" color="textSecondary" center>
+        <AppText role="body" color="textSecondary" center accessibilityLiveRegion="polite">
           {confirmed
             ? content.confirmedBody
-            : 'The transfer was not confirmed.'}
+            : failed
+              ? preferences.guidanceLevel === 'quick' ? content.failedBody : draft.failureReason ?? content.failedBody
+              : 'The transfer was not confirmed. Start a new transfer from PayNow to continue.'}
         </AppText>
       </View>
 
@@ -72,6 +94,10 @@ export function SuccessScreen() {
           title="What happens next?"
           items={content.nextSteps}
         />
+      ) : null}
+
+      {failed && preferences.guidanceLevel === 'guided' ? (
+        <GuidancePanel title="You can recover without starting over" body={content.failedBody} items={content.retrySteps} />
       ) : null}
 
       {confirmed ? (
@@ -89,8 +115,9 @@ export function SuccessScreen() {
         </AppCard>
       ) : null}
 
-      {/* TODO: SAFETY FEATURE — Dev D: offer error recovery / human assistance
-          if the transfer failed. */}
+      <AppText role="caption" color="textSecondary" center>
+        Synthetic demo only. No actual bank transfer or movement of money occurred.
+      </AppText>
     </ScreenContainer>
   );
 }

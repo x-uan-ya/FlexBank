@@ -15,6 +15,9 @@
 
 import type { AppAction } from '@/types/actions';
 import type { AppSessionState } from '@/types/session';
+import { MOCK_RECIPIENTS } from '@/data/recipients';
+import { simulateOutcome } from '@/features/paynow/outcome';
+import { canConfirmTransaction, validateTransaction } from '@/features/paynow/validation';
 import { DEFAULT_HOME_LAYOUT } from '@/types/home';
 import { DEFAULT_PREFERENCES } from '@/types/preferences';
 import { EMPTY_DRAFT, REVIEW_TRIGGERS, type TransactionDraft } from '@/types/transaction';
@@ -32,12 +35,17 @@ export const initialSessionState: AppSessionState = {
 function requiresReReview(prev: TransactionDraft, changedKey: keyof TransactionDraft): boolean {
   // Only matters once the customer has already reached a reviewable state.
   const alreadyReviewed =
-    prev.status === 'readyForReview' || prev.status === 'reviewRequired';
+    prev.status === 'readyForReview' || prev.status === 'reviewRequired' ||
+    prev.status === 'failed' || prev.requiresReview;
   return alreadyReviewed && REVIEW_TRIGGERS.includes(changedKey);
 }
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function isTerminal(draft: TransactionDraft): boolean {
+  return draft.status === 'confirmed' || draft.status === 'cancelled';
 }
 
 export function sessionReducer(
@@ -91,7 +99,16 @@ export function sessionReducer(
       };
 
     case 'SET_RECIPIENT': {
-      const r = action.payload;
+      if (isTerminal(state.transaction)) return state;
+      // Derive all display fields from the same trusted synthetic directory.
+      const r = MOCK_RECIPIENTS.find((recipient) => recipient.id === action.payload.id);
+      if (!r) return state;
+      if (
+        state.transaction.recipientId === r.id &&
+        state.transaction.recipientName === r.name &&
+        state.transaction.recipientBank === r.bank &&
+        state.transaction.recipientIdentifier === r.maskedIdentifier
+      ) return state;
       const needsReview = requiresReReview(state.transaction, 'recipientId');
       return {
         ...state,
@@ -103,11 +120,15 @@ export function sessionReducer(
           recipientIdentifier: r.maskedIdentifier,
           status: needsReview ? 'reviewRequired' : 'editing',
           requiresReview: needsReview || state.transaction.requiresReview,
+          lastValidatedAt: null,
+          failureReason: undefined,
         },
       };
     }
 
     case 'SET_AMOUNT': {
+      if (isTerminal(state.transaction) || !Number.isFinite(action.payload)) return state;
+      if (state.transaction.amount === action.payload) return state;
       const needsReview = requiresReReview(state.transaction, 'amount');
       return {
         ...state,
@@ -116,18 +137,26 @@ export function sessionReducer(
           amount: action.payload,
           status: needsReview ? 'reviewRequired' : 'editing',
           requiresReview: needsReview || state.transaction.requiresReview,
+          lastValidatedAt: null,
+          failureReason: undefined,
         },
       };
     }
 
     case 'SET_TRANSACTION_STEP':
+      if (isTerminal(state.transaction)) return state;
       return {
         ...state,
         transaction: { ...state.transaction, currentStep: action.payload },
       };
 
-    case 'MARK_READY_FOR_REVIEW':
-      // Dev B calls this after validation passes.
+    case 'MARK_READY_FOR_REVIEW': {
+      // Authoritative guard: direct actions cannot approve incomplete drafts.
+      if (
+        !['editing', 'reviewRequired', 'failed', 'readyForReview'].includes(state.transaction.status) ||
+        !validateTransaction(state.transaction).valid
+      ) return state;
+      if (canConfirmTransaction(state.transaction)) return state;
       return {
         ...state,
         transaction: {
@@ -136,42 +165,46 @@ export function sessionReducer(
           currentStep: 'review',
           requiresReview: false,
           lastValidatedAt: nowIso(),
+          failureReason: undefined,
         },
       };
+    }
 
     case 'CONFIRM_TRANSACTION': {
-      // SAFETY: confirmation is only valid from a review-ready state. If the
-      // draft still requires review, keep it in reviewRequired instead.
-      if (
-        state.transaction.status !== 'readyForReview' ||
-        state.transaction.requiresReview
-      ) {
-        return {
-          ...state,
-          transaction: { ...state.transaction, status: 'reviewRequired' },
-        };
-      }
+      // Check the current reducer state, never a screen's potentially stale copy.
+      if (!canConfirmTransaction(state.transaction)) return state;
+      const outcome = simulateOutcome(state.transaction);
       return {
         ...state,
         transaction: {
           ...state.transaction,
-          status: 'confirmed',
+          status: outcome.ok ? 'confirmed' : 'failed',
           currentStep: 'confirmation',
+          requiresReview: !outcome.ok,
+          lastValidatedAt: outcome.ok ? state.transaction.lastValidatedAt : null,
+          failureReason: outcome.ok ? undefined : outcome.reason,
         },
       };
     }
 
     case 'FAIL_TRANSACTION':
+      if (
+        !canConfirmTransaction(state.transaction) ||
+        typeof action.payload.reason !== 'string' || !action.payload.reason.trim()
+      ) return state;
       return {
         ...state,
         transaction: {
           ...state.transaction,
           status: 'failed',
           failureReason: action.payload.reason,
+          requiresReview: true,
+          lastValidatedAt: null,
         },
       };
 
     case 'CANCEL_TRANSACTION':
+      if (isTerminal(state.transaction)) return state;
       return {
         ...state,
         transaction: { ...EMPTY_DRAFT, status: 'cancelled' },
@@ -179,6 +212,7 @@ export function sessionReducer(
 
     /* ---------------- Safety (Dev D) ---------------- */
     case 'REQUEST_CHECKPOINT':
+      if (isTerminal(state.transaction)) return state;
       return {
         ...state,
         interactionMode: 'guided',

@@ -21,7 +21,7 @@ import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 
 import { usePayNow } from '../usePayNow';
-import { validateAmount } from '../validation';
+import { validateRecipient, validateTransaction } from '../validation';
 
 /**
  * Amount entry (Developer B). Validates with customer-friendly messages, then
@@ -33,6 +33,7 @@ export function AmountScreen() {
   const paynow = usePayNow();
   const preferences = usePreferences();
   const content = PAYNOW_AMOUNT_CONTENT[preferences.guidanceLevel];
+  const recipientValid = validateRecipient(paynow.draft).valid;
 
   const [raw, setRaw] = useState(
     paynow.draft.amount !== undefined ? String(paynow.draft.amount) : '',
@@ -45,16 +46,34 @@ export function AmountScreen() {
   }
 
   function next() {
-    const amount = Number(raw);
-    // Write the amount first so validation runs against the latest draft.
-    paynow.setAmount(amount);
-    const result = validateAmount({ ...paynow.draft, amount });
-    if (!result.valid) {
-      setError(result.messages[0]);
+    if (paynow.draft.status === 'confirmed' || paynow.draft.status === 'cancelled') {
+      setError('Start a new transfer before entering another amount.');
       return;
     }
+    // Preserve the entered text and reject malformed input rather than changing
+    // its meaning (for example, turning a pasted negative amount into positive).
+    const entered = raw.trim();
+    if (entered && !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(entered)) {
+      setError('Enter an amount using numbers and one decimal point, for example 12.50.');
+      return;
+    }
+    if ((entered.split('.')[1]?.length ?? 0) > 2) {
+      setError('Use at most 2 decimal places, for example 12.50.');
+      return;
+    }
+    const amount = entered === '' ? undefined : Number(entered);
+    const result = validateTransaction({ ...paynow.draft, amount });
+    if (!result.valid) {
+      setError(result.messages.join(' '));
+      return;
+    }
+    const alreadyReviewed = paynow.draft.requiresReview ||
+      ['readyForReview', 'reviewRequired', 'failed'].includes(paynow.draft.status);
+    if (amount !== undefined && amount !== paynow.draft.amount) {
+      paynow.setAmount(amount);
+    }
     setError(undefined);
-    paynow.requestReview();
+    if (!alreadyReviewed) paynow.requestReview();
     router.push('/paynow/review');
   }
 
@@ -70,6 +89,15 @@ export function AmountScreen() {
       <ReadabilityModeSwitcher />
 
       <TransactionProgress currentStep="amount" />
+
+      {!recipientValid ? (
+        <AppButton
+          label="Choose recipient"
+          variant="secondary"
+          onPress={() => router.replace('/paynow/recipient')}
+          accessibilityHint="Returns to recipient selection without resetting the transfer draft"
+        />
+      ) : null}
 
       {preferences.guidanceLevel === 'guided' ? (
         <GuidancePanel
@@ -143,7 +171,7 @@ export function AmountScreen() {
             placeholder="0.00"
             value={raw}
             onChangeText={(t) => {
-              setRaw(t.replace(/[^0-9.]/g, ''));
+              setRaw(t);
               if (error) setError(undefined);
             }}
             error={error}

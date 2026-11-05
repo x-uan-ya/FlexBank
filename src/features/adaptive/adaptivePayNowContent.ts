@@ -29,6 +29,9 @@ interface SuccessContent {
   title: string;
   confirmedBody: string;
   nextSteps?: string[];
+  failedTitle: string;
+  failedBody: string;
+  retrySteps?: string[];
 }
 
 export const PAYNOW_START_CONTENT: Record<GuidanceLevel, StartContent> = {
@@ -44,7 +47,7 @@ export const PAYNOW_START_CONTENT: Record<GuidanceLevel, StartContent> = {
     title: 'How PayNow works',
     body: 'We will guide you through each required step. Nothing is sent until you review the details and press Confirm and send.',
     steps: [
-      'Choose the saved recipient you intend to pay.',
+      'Choose a saved recipient, or find and select one from the demo mobile directory.',
       'Enter the amount in Singapore dollars.',
       'Review the recipient, masked destination and amount.',
       'Confirm the simulated transfer yourself.',
@@ -58,7 +61,7 @@ export const PAYNOW_RECIPIENT_CONTENT: Record<GuidanceLevel, RecipientContent> =
   guided: {
     heading: 'Choose the recipient',
     guidanceTitle: 'Step 1: Choose carefully',
-    guidanceBody: 'Select the person you intend to pay. No recipient is selected automatically.',
+    guidanceBody: 'Choose a saved recipient or look up a demo mobile number. Check the matched details and select Use this recipient. No recipient is selected automatically.',
     reminders: [
       'Check the recipient name.',
       'Check the bank and masked destination before continuing.',
@@ -97,14 +100,25 @@ export const PAYNOW_SUCCESS_CONTENT: Record<GuidanceLevel, SuccessContent> = {
   quick: {
     title: 'Transfer sent',
     confirmedBody: 'Simulated transfer complete. No real money moved.',
+    failedTitle: 'Transfer not completed',
+    failedBody: 'The simulated transfer failed. No real money moved.',
   },
   balanced: {
     title: 'Transfer sent',
     confirmedBody: 'This is a simulated confirmation. No real money moved.',
+    failedTitle: 'Transfer not completed',
+    failedBody: 'The simulated transfer could not be completed. Your details are saved so you can edit and try again.',
   },
   guided: {
     title: 'Your simulated transfer is complete',
     confirmedBody: 'The transfer was confirmed and the receipt below summarises what happened. No real money moved.',
+    failedTitle: 'Your simulated transfer was not completed',
+    failedBody: 'No real money moved. Your recipient and amount are still saved. You can edit the details, review them again and choose whether to confirm.',
+    retrySteps: [
+      'Choose Edit details and try again to return to the amount.',
+      'Check the recipient and amount, then review the details again.',
+      'Confirm only when the details are correct, or ask for help.',
+    ],
     nextSteps: [
       'Review the recipient, amount and reference in the receipt.',
       'Select Back to home when you are ready.',

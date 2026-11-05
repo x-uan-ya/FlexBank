@@ -7,6 +7,13 @@ import type { TransactionDraft } from '@/types/transaction';
 
 import { validateTransaction } from './validation';
 
+/** Additive PayNow-only methods; shared callers keep the existing contract. */
+export type PayNowApi = PayNowContract & {
+  draft: TransactionDraft;
+  cancelTransfer(): void;
+  failTransfer(reason: string): void;
+};
+
 /**
  * PayNow feature API (Developer B), exposed as a hook so it can dispatch typed
  * actions. Implements `PayNowContract`. Screens call these methods instead of
@@ -17,7 +24,7 @@ import { validateTransaction } from './validation';
  * it. The reducer additionally refuses to confirm unless the draft is
  * review-ready and has no pending re-review.
  */
-export function usePayNow(): PayNowContract & { draft: TransactionDraft } {
+export function usePayNow(): PayNowApi {
   const dispatch = useAppDispatch();
   const draft = useTransaction();
 
@@ -40,8 +47,14 @@ export function usePayNow(): PayNowContract & { draft: TransactionDraft } {
         dispatch({ type: 'MARK_READY_FOR_REVIEW' });
       },
       confirmTransaction() {
-        // Explicit customer action only.
+        // Explicit customer action only. Reducer validates and simulates outcome.
         dispatch({ type: 'CONFIRM_TRANSACTION' });
+      },
+      cancelTransfer() {
+        dispatch({ type: 'CANCEL_TRANSACTION' });
+      },
+      failTransfer(reason: string) {
+        dispatch({ type: 'FAIL_TRANSACTION', payload: { reason } });
       },
     }),
     [dispatch, draft],

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -21,6 +22,7 @@ import { useTheme } from '@/theme';
 import { formatMoney } from '@/utils';
 
 import { usePayNow } from '../usePayNow';
+import { canConfirmTransaction, canShowSuccessfulReceipt, validateRecipient, validateTransaction } from '../validation';
 
 /**
  * Review before confirmation (Developer B + safety-critical).
@@ -39,13 +41,52 @@ export function ReviewScreen() {
   const preferences = usePreferences();
   const content = PAYNOW_REVIEW_CONTENT[preferences.guidanceLevel];
   const { draft } = paynow;
+  const [submissionRequested, setSubmissionRequested] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | undefined>();
+  const outcomeNavigationStarted = useRef(false);
 
-  const needsReReview = draft.requiresReview || draft.status === 'reviewRequired';
+  const validation = validateTransaction(draft);
+  const needsReReview = draft.requiresReview || draft.status === 'reviewRequired' || draft.status === 'failed';
+  const canConfirm = canConfirmTransaction(draft);
+  const terminal = draft.status === 'confirmed' || draft.status === 'cancelled';
+
+  useEffect(() => {
+    if (!submissionRequested || outcomeNavigationStarted.current) return;
+    const acceptedSuccess = canShowSuccessfulReceipt(draft);
+    const acceptedFailure = draft.status === 'failed' && validateTransaction(draft).valid;
+    if (acceptedSuccess || acceptedFailure) {
+      outcomeNavigationStarted.current = true;
+      router.replace('/paynow/success');
+    } else if (!canConfirmTransaction(draft)) {
+      setSubmissionRequested(false);
+      setSubmissionError('The transfer was not submitted. Check the details and review again.');
+    }
+  }, [draft, router, submissionRequested]);
 
   function confirm() {
-    // Explicit customer action. Reducer verifies the draft is review-ready.
+    if (!canConfirm || submissionRequested) return;
+    setSubmissionError(undefined);
+    setSubmissionRequested(true);
+    // The reducer validates and records the outcome. The effect above only
+    // navigates once that authoritative outcome is visible in shared state.
     paynow.confirmTransaction();
-    router.replace('/paynow/success');
+  }
+
+  function reviewAgain() {
+    if (!validation.valid || terminal) return;
+    setSubmissionError(undefined);
+    paynow.requestReview();
+  }
+
+  function editDetails() {
+    router.replace(validateRecipient(draft).valid ? '/paynow/amount' : '/paynow/recipient');
+  }
+
+  function cancel() {
+    if (terminal || submissionRequested) return;
+    setSubmissionRequested(false);
+    paynow.cancelTransfer();
+    router.replace('/home');
   }
 
   return (
@@ -57,14 +98,23 @@ export function ReviewScreen() {
           <AppButton
             label="Confirm and send"
             onPress={confirm}
-            disabled={needsReReview}
+            disabled={!canConfirm || submissionRequested}
+            loading={submissionRequested}
             accessibilityHint="Sends the transfer after you confirm"
           />
           <AppButton
             label="Edit details"
             variant="secondary"
-            onPress={() => router.back()}
+            onPress={editDetails}
+            disabled={terminal || submissionRequested}
             accessibilityHint="Returns to edit the transfer without clearing it"
+          />
+          <AppButton
+            label="Cancel transfer"
+            variant="ghost"
+            onPress={cancel}
+            disabled={terminal || submissionRequested}
+            accessibilityHint="Clears this transfer and returns to Home"
           />
         </View>
       }
@@ -79,6 +129,17 @@ export function ReviewScreen() {
       <ReadabilityModeSwitcher />
 
       <TransactionProgress currentStep="review" />
+
+      {!validation.valid || submissionError ? (
+        <AppCard elevation="none" style={{ borderColor: theme.colors.danger }}>
+          <AppText role="bodyStrong" color="danger" accessibilityLiveRegion="polite">
+            {submissionError ?? validation.messages.join(' ')}
+          </AppText>
+          <AppText role="caption" color="textSecondary">
+            Use Edit details to correct the recipient and amount before confirming.
+          </AppText>
+        </AppCard>
+      ) : null}
 
       <AppCard elevation="none" style={{ backgroundColor: theme.colors.surfaceMuted }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
@@ -112,7 +173,8 @@ export function ReviewScreen() {
             <AppButton
               label="I have reviewed the details"
               variant="secondary"
-              onPress={() => paynow.requestReview()}
+              onPress={reviewAgain}
+              disabled={!validation.valid || terminal || submissionRequested}
             />
           </View>
         </AppCard>

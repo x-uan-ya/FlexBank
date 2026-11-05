@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
+  AppButton,
   AppCard,
+  AppInput,
   AppText,
   EmptyState,
   Header,
@@ -22,6 +25,7 @@ import { useTheme } from '@/theme';
 import type { Recipient } from '@/types/banking';
 
 import { usePayNow } from '../usePayNow';
+import { lookupRecipientByMobile } from '../proxyLookup';
 
 /**
  * Recipient selection (Developer B). Picks a synthetic recipient and advances
@@ -33,10 +37,21 @@ export function RecipientScreen() {
   const paynow = usePayNow();
   const preferences = usePreferences();
   const content = PAYNOW_RECIPIENT_CONTENT[preferences.guidanceLevel];
+  const [mobile, setMobile] = useState('');
+  const [mobileError, setMobileError] = useState<string | undefined>();
+  const [matchedRecipient, setMatchedRecipient] = useState<Recipient | undefined>();
+  const editable = paynow.draft.status !== 'confirmed' && paynow.draft.status !== 'cancelled';
 
   function choose(recipient: Recipient) {
+    if (!editable) return;
     paynow.setRecipient(recipient);
     router.push('/paynow/amount');
+  }
+
+  function findByMobile() {
+    const result = lookupRecipientByMobile(mobile);
+    setMatchedRecipient(result.ok ? result.recipient : undefined);
+    setMobileError(result.ok ? undefined : result.message);
   }
 
   return (
@@ -51,6 +66,13 @@ export function RecipientScreen() {
       <ReadabilityModeSwitcher />
 
       <TransactionProgress currentStep="recipient" />
+
+      {!editable ? (
+        <AppCard elevation="none" style={{ gap: theme.spacing.md }}>
+          <AppText>This transfer is complete or cancelled. Start a new transfer to pay someone.</AppText>
+          <AppButton label="Start a new transfer" variant="secondary" onPress={() => router.push('/paynow')} />
+        </AppCard>
+      ) : null}
 
       {preferences.guidanceLevel === 'guided' ? (
         <GuidancePanel
@@ -81,6 +103,8 @@ export function RecipientScreen() {
                 key={recipient.id}
                 accessibilityRole="button"
                 accessibilityLabel={`Pay ${recipient.name} at ${recipient.bank}`}
+                accessibilityState={{ selected, disabled: !editable }}
+                disabled={!editable}
                 onPress={() => choose(recipient)}
                 style={({ pressed }) => (pressed ? { opacity: 0.9 } : null)}
               >
@@ -125,9 +149,52 @@ export function RecipientScreen() {
         </View>
       )}
 
-      <AppText role="caption" color="textMuted" center>
-        Adding a new recipient is not available in this prototype.
-      </AppText>
+      <AppCard>
+        <View style={{ gap: theme.spacing.md }}>
+          <AppText role="subheading">Or find a recipient by mobile number</AppText>
+          <AppText role="caption" color="textSecondary">
+            Demo directory only. Try 9000 4821 for synthetic recipient Alex Tan.
+            No real mobile numbers or bank accounts are searched.
+          </AppText>
+          <AppInput
+            label="PayNow mobile number"
+            hint="8 digits, optionally starting with +65"
+            value={mobile}
+            onChangeText={(value) => {
+              setMobile(value);
+              setMobileError(undefined);
+              setMatchedRecipient(undefined);
+            }}
+            error={mobileError}
+            keyboardType="phone-pad"
+            maxLength={20}
+            autoCorrect={false}
+            editable={editable}
+            returnKeyType="done"
+            onSubmitEditing={editable ? findByMobile : undefined}
+          />
+          <AppButton label="Find recipient" variant="secondary" onPress={findByMobile} disabled={!editable} />
+          {matchedRecipient ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <View accessibilityLiveRegion="polite" style={{ gap: theme.spacing.xs }}>
+                <AppText role="bodyStrong">{matchedRecipient.name}</AppText>
+                <AppText color="textSecondary">
+                  {matchedRecipient.bank} {matchedRecipient.maskedIdentifier}
+                </AppText>
+                <AppText role="caption" color="textSecondary">
+                  Check these demo details before choosing this recipient.
+                </AppText>
+              </View>
+              <AppButton
+                label="Use this recipient"
+                accessibilityLabel={`Use ${matchedRecipient.name} as recipient`}
+                onPress={() => choose(matchedRecipient)}
+                disabled={!editable}
+              />
+            </View>
+          ) : null}
+        </View>
+      </AppCard>
     </ScreenContainer>
   );
 }
