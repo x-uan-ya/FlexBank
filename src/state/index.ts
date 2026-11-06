@@ -7,6 +7,8 @@
 export {
   SessionProvider,
   useSession,
+  useAuth,
+  useAuthState,
   usePreferences,
   useTransaction,
   useHomeLayout,

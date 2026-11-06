@@ -6,6 +6,7 @@
  */
 
 export * from './preferences';
+export * from './auth';
 export * from './transaction';
 export * from './banking';
 export * from './home';

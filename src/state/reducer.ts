@@ -20,6 +20,8 @@ import { DEFAULT_PREFERENCES } from '@/types/preferences';
 import { EMPTY_DRAFT, REVIEW_TRIGGERS, type TransactionDraft } from '@/types/transaction';
 
 export const initialSessionState: AppSessionState = {
+  authStatus: 'loading',
+  user: null,
   preferences: DEFAULT_PREFERENCES,
   transaction: EMPTY_DRAFT,
   homeLayout: DEFAULT_HOME_LAYOUT,
@@ -45,6 +47,42 @@ export function sessionReducer(
   action: AppAction,
 ): AppSessionState {
   switch (action.type) {
+    /* ---------------- Auth / session ---------------- */
+    case 'AUTH_RESTORED':
+      // Called once on boot after checking persisted storage.
+      if (action.payload) {
+        return {
+          ...state,
+          authStatus: 'signedIn',
+          user: action.payload.profile,
+          preferences: action.payload.preferences,
+          onboardingCompleted: true,
+        };
+      }
+      return { ...state, authStatus: 'signedOut', user: null };
+
+    case 'AUTH_SIGNED_IN':
+      return {
+        ...state,
+        authStatus: 'signedIn',
+        user: action.payload.profile,
+        preferences: action.payload.preferences,
+        onboardingCompleted: true,
+      };
+
+    case 'AUTH_SIGNED_OUT':
+      // Reset to a clean signed-out baseline (no lingering user data).
+      return {
+        ...initialSessionState,
+        authStatus: 'signedOut',
+      };
+
+    case 'SET_BANKING_PURPOSES':
+      return {
+        ...state,
+        preferences: { ...state.preferences, bankingPurposes: action.payload },
+      };
+
     /* ---------------- Personalisation (Dev A) ---------------- */
     case 'SET_PREFERENCES':
       return {

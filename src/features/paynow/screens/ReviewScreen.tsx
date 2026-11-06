@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -10,6 +11,8 @@ import {
 } from '@/components';
 import { useTheme } from '@/theme';
 import { formatMoney } from '@/utils';
+
+import { ConciergeHelpPanel } from '@/features/concierge/components/ConciergeHelpPanel';
 
 import { simulateOutcome } from '../outcome';
 import { usePayNow } from '../usePayNow';
@@ -32,6 +35,7 @@ export function ReviewScreen() {
   const router = useRouter();
   const paynow = usePayNow();
   const { draft } = paynow;
+  const [showHelp, setShowHelp] = useState(false);
 
   const needsReReview = draft.requiresReview || draft.status === 'reviewRequired';
 
@@ -124,13 +128,19 @@ export function ReviewScreen() {
         />
       </AppCard>
 
-      {/* TODO: CONCIERGE FEATURE — Dev C: add an "Explain this" affordance that
-          calls concierge.explain('paynow-review'). */}
-      <AppButton
-        label="Explain this screen"
-        variant="ghost"
-        onPress={() => router.push('/concierge')}
-      />
+      {showHelp ? (
+        <ConciergeHelpPanel
+          context="paynow-review"
+          title="What should I check before confirming?"
+          onClose={() => setShowHelp(false)}
+        />
+      ) : (
+        <AppButton
+          label="Explain this screen"
+          variant="ghost"
+          onPress={() => setShowHelp(true)}
+        />
+      )}
 
       <AppText role="caption" color="textMuted" center>
         No real money moves. Synthetic demo data only.

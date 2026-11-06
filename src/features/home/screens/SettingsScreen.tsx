@@ -7,62 +7,72 @@ import {
   AppText,
   Header,
   Icon,
+  type IconName,
   ScreenContainer,
   SelectableCard,
   ThemePreview,
 } from '@/components';
-import { useAppDispatch, usePreferences } from '@/state';
+import { useAuth, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import {
+  BANKING_PURPOSES,
   DISPLAY_MODE_LABELS,
   GUIDANCE_LABELS,
-  PRIORITY_LABELS,
+  LANGUAGE_LABELS,
   VISUAL_THEME_DESCRIPTIONS,
   VISUAL_THEME_LABELS,
+  type BankingPurpose,
+  type CustomerPreferences,
   type DisplayMode,
   type GuidanceLevel,
-  type Priority,
+  type Language,
   type VisualTheme,
 } from '@/types/preferences';
 
-import { explainHomeConfig } from '../personalisationRules';
-
 /**
- * Settings + personalisation (Developer A / UI lead).
+ * Settings + personalisation (integration lead).
  *
- * Lets the customer change guidance, display, priorities and visual theme at
- * any time. Every change dispatches immediately and is reflected across the app
- * without a restart (theme re-renders from preferences; home re-reads its
- * deterministic config). Includes a clear note that these settings change the
- * INTERFACE, not banking permissions, and a reset-to-standard.
+ * Lets the signed-in customer change banking purposes, guidance, display,
+ * language and visual theme at any time. Every change is persisted for the
+ * user (via authService) AND applied to session state immediately, so the home
+ * re-personalises without a restart. Includes a clear note that these settings
+ * change the INTERFACE, not banking permissions, plus logout + reset.
  */
 
 const GUIDANCE_OPTIONS: GuidanceLevel[] = ['quick', 'balanced', 'guided'];
 const DISPLAY_OPTIONS: DisplayMode[] = ['standard', 'largeText', 'highClarity'];
-const PRIORITY_OPTIONS: Priority[] = ['payments', 'moneyManagement', 'guidance', 'accessibility'];
+const LANGUAGE_OPTIONS: Language[] = ['en', 'zh'];
 const THEME_OPTIONS: VisualTheme[] = ['classic', 'nature', 'playful', 'seasonal'];
 
 export function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const dispatch = useAppDispatch();
+  const { savePreferences, logout } = useAuth();
   const prefs = usePreferences();
 
-  function togglePriority(p: Priority) {
-    const next = prefs.priorities.includes(p)
-      ? prefs.priorities.filter((x) => x !== p)
-      : [...prefs.priorities, p];
-    // Keep at least one priority so the home layout always has a driver.
-    dispatch({ type: 'SET_PREFERENCES', payload: { priorities: next.length ? next : ['payments'] } });
+  /** Persist a preference change for the signed-in user + apply it live. */
+  function update(patch: Partial<CustomerPreferences>) {
+    void savePreferences({ ...prefs, ...patch });
   }
 
-  const reasons = explainHomeConfig(prefs);
+  function togglePurpose(p: BankingPurpose) {
+    const next = prefs.bankingPurposes.includes(p)
+      ? prefs.bankingPurposes.filter((x) => x !== p)
+      : [...prefs.bankingPurposes, p];
+    // Keep at least one purpose so the home always has a driver.
+    update({ bankingPurposes: next.length ? next : ['everyday'] });
+  }
+
+  async function onLogout() {
+    await logout();
+    router.replace('/login');
+  }
 
   return (
     <ScreenContainer scroll>
       <Header
         title="Settings"
-        subtitle="Change how FlexBank looks and guides you"
+        subtitle="Change how FlexBank works for you"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
@@ -71,12 +81,35 @@ export function SettingsScreen() {
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
           <Icon name="info" size={18} color={theme.colors.accent} />
           <AppText role="caption" color="textSecondary" style={{ flex: 1 }}>
-            These settings change the interface only. They never change your
-            banking permissions, your balances, or any security requirement. You
-            can change them anytime.
+            These settings change the interface and what we prioritise on your
+            home. They never change your banking permissions, your balances, or
+            any security requirement. You can change them anytime.
           </AppText>
         </View>
       </AppCard>
+
+      <Group title="Banking purposes" hint="What you mainly use banking for. This shapes your home.">
+        {BANKING_PURPOSES.map((p) => (
+          <SelectableCard
+            key={p.key}
+            control="checkbox"
+            title={p.label}
+            description={p.description}
+            selected={prefs.bankingPurposes.includes(p.key)}
+            onPress={() => togglePurpose(p.key)}
+            leading={
+              <Icon
+                name={p.icon as IconName}
+                size={20}
+                color={theme.colors.primary}
+                circle
+                circleColor={theme.colors.accentSoft}
+                circleSize={44}
+              />
+            }
+          />
+        ))}
+      </Group>
 
       <Group title="Guidance level">
         {GUIDANCE_OPTIONS.map((g) => (
@@ -84,7 +117,7 @@ export function SettingsScreen() {
             key={g}
             title={GUIDANCE_LABELS[g]}
             selected={prefs.guidanceLevel === g}
-            onPress={() => dispatch({ type: 'SET_PREFERENCES', payload: { guidanceLevel: g } })}
+            onPress={() => update({ guidanceLevel: g })}
           />
         ))}
       </Group>
@@ -95,19 +128,18 @@ export function SettingsScreen() {
             key={d}
             title={DISPLAY_MODE_LABELS[d]}
             selected={prefs.displayMode === d}
-            onPress={() => dispatch({ type: 'SET_DISPLAY_MODE', payload: d })}
+            onPress={() => update({ displayMode: d })}
           />
         ))}
       </Group>
 
-      <Group title="Banking priorities" hint="Choose all that apply.">
-        {PRIORITY_OPTIONS.map((p) => (
+      <Group title="Language">
+        {LANGUAGE_OPTIONS.map((l) => (
           <SelectableCard
-            key={p}
-            control="checkbox"
-            title={PRIORITY_LABELS[p]}
-            selected={prefs.priorities.includes(p)}
-            onPress={() => togglePriority(p)}
+            key={l}
+            title={LANGUAGE_LABELS[l]}
+            selected={prefs.language === l}
+            onPress={() => update({ language: l })}
           />
         ))}
       </Group>
@@ -125,35 +157,15 @@ export function SettingsScreen() {
               label={VISUAL_THEME_LABELS[t]}
               description={VISUAL_THEME_DESCRIPTIONS[t]}
               selected={prefs.visualTheme === t}
-              onPress={() => dispatch({ type: 'SET_VISUAL_THEME', payload: t })}
+              onPress={() => update({ visualTheme: t })}
             />
           ))}
         </ScrollView>
       </Group>
 
-      {/* Transparency: why the home looks the way it does. */}
-      {reasons.length > 0 ? (
-        <Group title="How your home adapts">
-          <AppCard>
-            <View style={{ gap: theme.spacing.xs }}>
-              {reasons.map((r) => (
-                <View key={r} style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
-                  <Icon name="check" size={14} color={theme.colors.success} />
-                  <AppText role="caption" color="textSecondary" style={{ flex: 1 }}>
-                    {r}
-                  </AppText>
-                </View>
-              ))}
-            </View>
-          </AppCard>
-        </Group>
-      ) : null}
-
-      <AppButton
-        label="Reset to standard"
-        variant="secondary"
-        onPress={() => dispatch({ type: 'RESET_PREFERENCES' })}
-      />
+      <View style={{ gap: theme.spacing.sm, marginTop: theme.spacing.md }}>
+        <AppButton label="Log out" variant="secondary" onPress={onLogout} />
+      </View>
       <View style={{ height: theme.spacing.md }} />
     </ScreenContainer>
   );

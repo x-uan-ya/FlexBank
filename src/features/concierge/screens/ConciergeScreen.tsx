@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   AppButton,
@@ -10,84 +10,222 @@ import {
   LoadingState,
   ScreenContainer,
 } from '@/components';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
+import type { Language } from '@/types/preferences';
 
 import { concierge } from '../concierge';
 
-/**
- * AI Banking Concierge placeholder (Developer C).
- *
- * Works today using the DETERMINISTIC FALLBACK (no AI wired in). This proves the
- * integration point: the screen calls the `ConciergeContract` and shows whether
- * the response came from the fallback. Dev C swaps in a real provider behind the
- * same contract and keeps the fallback path.
- */
+const HELP_TOPICS = [
+  {
+    context: 'paynow-recipient',
+    label: 'Who am I sending money to?',
+  },
+  {
+    context: 'paynow-amount',
+    label: 'What amount should I enter?',
+  },
+  {
+    context: 'paynow-review',
+    label: 'What should I check before confirming?',
+  },
+  {
+    context: 'paynow-proxy',
+    label: 'What does “PayNow proxy” mean?',
+  },
+];
+
 export function ConciergeScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const preferences = usePreferences();
+  const params = useLocalSearchParams<{ context?: string }>();
 
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [englishAnswer, setEnglishAnswer] = useState<string | null>(null);
+  const [question, setQuestion] = useState('');
   const [usedFallback, setUsedFallback] = useState(false);
+  const [displayLanguage, setDisplayLanguage] = useState<Language>('en');
 
-  async function explainReview() {
+  // Auto-load when opened with a context query (e.g. /concierge?context=paynow-review).
+  useEffect(() => {
+    const initial = params.context;
+    if (typeof initial === 'string' && initial.length > 0) {
+      const topic = HELP_TOPICS.find((t) => t.context === initial);
+      void explainTopic(initial, topic?.label ?? 'Help for this step');
+    }
+    // Only on first mount / param change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.context]);
+
+  async function explainTopic(context: string, label: string) {
+    if (loading) return;
+
     setLoading(true);
-    const res = await concierge.explain('paynow-review');
-    setAnswer(res.text);
-    setUsedFallback(res.usedFallback);
-    setLoading(false);
+    setQuestion(label);
+    setAnswer(null);
+    setEnglishAnswer(null);
+    setDisplayLanguage('en');
+
+    try {
+      const response = await concierge.explain(context);
+      setAnswer(response.text);
+      setEnglishAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+    } catch {
+      setAnswer(
+        'Help is temporarily unavailable. You can go back and check your transfer details. If you are unsure, pause before confirming.',
+      );
+      setEnglishAnswer(null);
+      setUsedFallback(true);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  async function simplifyAnswer() {
+    if (loading || englishAnswer === null) return;
+
+    setLoading(true);
+
+    try {
+      const response = await concierge.simplify(englishAnswer);
+      setAnswer(response.text);
+      setEnglishAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+      setDisplayLanguage('en');
+    } catch {
+      setAnswer(
+        'Could not simplify right now. You can still use the explanation above or go back to your transfer.',
+      );
+      setUsedFallback(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function translateToZh() {
+    if (loading || englishAnswer === null) return;
+
+    setLoading(true);
+
+    try {
+      const response = await concierge.translate(englishAnswer, 'zh');
+      setAnswer(response.text);
+      setUsedFallback(response.usedFallback);
+      setDisplayLanguage('zh');
+    } catch {
+      setAnswer(
+        'Could not translate right now. The English explanation is still available.',
+      );
+      setUsedFallback(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function readInEnglish() {
+    if (englishAnswer === null) return;
+    setAnswer(englishAnswer);
+    setDisplayLanguage('en');
+  }
+
+  // Only offer prepared Mandarin offline; do not imply Malay/Tamil work.
+  const showZhButton = displayLanguage !== 'zh';
 
   return (
     <ScreenContainer>
       <Header
-        title="Banking Concierge"
-        subtitle="Plain-language help"
+        title="Help"
+        subtitle="Help at your pace"
         onBack={router.canGoBack() ? () => router.back() : undefined}
       />
 
       <AppCard>
         <View style={{ gap: theme.spacing.sm }}>
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              backgroundColor: theme.colors.accentSoft,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              borderRadius: theme.radius.pill,
-            }}
-          >
-            <AppText role="caption" color="accent">
-              Developer C — Concierge
-            </AppText>
-          </View>
+          <AppText role="subheading">What would you like help with?</AppText>
+
           <AppText role="body" color="textSecondary">
-            This screen is a starting point. It uses a deterministic fallback so
-            the app works without AI. Wire a real provider behind the same
-            contract: concierge.explain / simplify / translate.
-          </AppText>
-          <AppText role="mono" color="textMuted">
-            {'// TODO: CONCIERGE FEATURE'}
+            Choose a question below for a simple explanation. This help does not
+            change your transfer details or send money.
           </AppText>
         </View>
       </AppCard>
 
-      <AppButton label="Explain the review screen" onPress={explainReview} />
+      <View style={{ gap: theme.spacing.sm }}>
+        {HELP_TOPICS.map((topic) => (
+          <AppButton
+            key={topic.context}
+            label={topic.label}
+            disabled={loading}
+            onPress={() => {
+              void explainTopic(topic.context, topic.label);
+            }}
+          />
+        ))}
+      </View>
 
       {loading ? <LoadingState message="Preparing an explanation…" /> : null}
 
-      {answer && !loading ? (
+      {answer !== null && !loading ? (
         <AppCard>
-          <View style={{ gap: theme.spacing.xs }}>
-            <AppText role="subheading">Explanation</AppText>
+          <View style={{ gap: theme.spacing.sm }}>
+            <AppText role="subheading">{question}</AppText>
+
             <AppText role="body">{answer}</AppText>
-            {usedFallback ? (
+
+            {englishAnswer !== null ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                <AppButton
+                  label="Simplify"
+                  variant="secondary"
+                  onPress={() => {
+                    void simplifyAnswer();
+                  }}
+                />
+
+                {showZhButton ? (
+                  <AppButton
+                    label="用中文阅读"
+                    onPress={() => {
+                      void translateToZh();
+                    }}
+                  />
+                ) : null}
+
+                {displayLanguage !== 'en' ? (
+                  <AppButton
+                    label="Read in English"
+                    variant="ghost"
+                    onPress={readInEnglish}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
+            <AppText role="caption" color="textMuted">
+              {usedFallback
+                ? 'Prepared explanation · No AI used'
+                : 'AI-assisted explanation'}
+            </AppText>
+
+            {preferences.language !== 'en' && preferences.language !== 'zh' ? (
               <AppText role="caption" color="textMuted">
-                Offline explanation (no AI used).
+                Prepared translations are available in English and Mandarin.
+                Other languages need the optional live AI setup.
               </AppText>
             ) : null}
           </View>
         </AppCard>
+      ) : null}
+
+      {router.canGoBack() ? (
+        <AppButton
+          label="Go back"
+          variant="ghost"
+          onPress={() => router.back()}
+        />
       ) : null}
     </ScreenContainer>
   );

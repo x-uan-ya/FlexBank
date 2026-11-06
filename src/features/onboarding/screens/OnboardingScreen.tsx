@@ -80,6 +80,7 @@ export function OnboardingScreen() {
       language: 'en',
       guidanceLevel,
       displayMode,
+      bankingPurposes: ['everyday'],
       priorities: chosen,
       voiceEnabled: false,
       visualTheme,
