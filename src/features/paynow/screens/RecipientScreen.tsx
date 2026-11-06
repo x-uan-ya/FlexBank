@@ -16,6 +16,8 @@ import { useTheme } from '@/theme';
 import type { Recipient } from '@/types/banking';
 
 import { lookupRecipientByMobile } from '../proxyLookup';
+import { ConciergeHelpPanel } from '@/features/concierge/components/ConciergeHelpPanel';
+
 import { usePayNow } from '../usePayNow';
 
 /**
@@ -25,6 +27,7 @@ import { usePayNow } from '../usePayNow';
  * the transfer draft is lost.
  */
 export function RecipientScreen() {
+  const [showHelp, setShowHelp] = useState(false);
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
@@ -122,6 +125,19 @@ export function RecipientScreen() {
           <AppButton label="Find recipient" onPress={findByMobile} />
         </View>
       </AppCard>
+      {showHelp ? (
+        <ConciergeHelpPanel
+          context="paynow-recipient"
+          title="Who am I sending money to?"
+          onClose={() => setShowHelp(false)}
+        />
+      ) : (
+        <AppButton
+          label="Explain this step"
+          variant="ghost"
+          onPress={() => setShowHelp(true)}
+        />
+      )}
     </ScreenContainer>
   );
 }
