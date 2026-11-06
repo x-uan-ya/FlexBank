@@ -17,12 +17,24 @@
  *   REQUEST_HUMAN_ASSISTANCE, RESOLVE_HUMAN_ASSISTANCE
  */
 
+import type { AuthResult } from './auth';
 import type { HomeWidget } from './home';
-import type { CustomerPreferences, DisplayMode, VisualTheme } from './preferences';
+import type {
+  BankingPurpose,
+  CustomerPreferences,
+  DisplayMode,
+  VisualTheme,
+} from './preferences';
 import type { InteractionMode } from './session';
 import type { Recipient } from './banking';
 
 export type AppAction =
+  // --- Auth / session (Integration lead) ---
+  | { type: 'AUTH_RESTORED'; payload: AuthResult | null }
+  | { type: 'AUTH_SIGNED_IN'; payload: AuthResult }
+  | { type: 'AUTH_SIGNED_OUT' }
+  | { type: 'SET_BANKING_PURPOSES'; payload: BankingPurpose[] }
+
   // --- Personalisation (Dev A) ---
   | { type: 'SET_PREFERENCES'; payload: Partial<CustomerPreferences> }
   | { type: 'SET_DISPLAY_MODE'; payload: DisplayMode }

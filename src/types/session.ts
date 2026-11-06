@@ -8,6 +8,7 @@
  * no sensitive inferred characteristics.
  */
 
+import type { AuthStatus, UserProfile } from './auth';
 import type { HomeWidget } from './home';
 import type { CustomerPreferences } from './preferences';
 import type { TransactionDraft } from './transaction';
@@ -22,6 +23,10 @@ import type { TransactionDraft } from './transaction';
 export type InteractionMode = 'normal' | 'guided' | 'assistance';
 
 export interface AppSessionState {
+  /** Auth status: loading (checking persisted session), signedOut, signedIn. */
+  authStatus: AuthStatus;
+  /** The signed-in user's profile, or null when signed out. */
+  user: UserProfile | null;
   /** Explicit customer choices. Drives theme + personalisation. */
   preferences: CustomerPreferences;
   /** The working PayNow transfer draft. */

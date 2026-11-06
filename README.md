@@ -44,6 +44,37 @@ The control only renders in `__DEV__`.
 
 ---
 
+## Accounts & purpose-based personalisation
+
+FlexBank has **login + multi-step registration** with on-device persistence
+(local-first; no server required). See `BACKEND.md` for the design and how to
+swap in Supabase later.
+
+- **Register** captures: basic info → **banking purposes** → experience
+  (guidance / display / language) → confirmation.
+- **Banking purposes** are the PRIMARY personalisation driver. The home screen
+  renders sections in an order derived from the customer's explicit purposes,
+  with a **"Why am I seeing this?"** explanation on each. Nothing is inferred.
+- Change purposes and preferences anytime in **Settings**; changes persist for
+  the user and apply live.
+- Passwords are salted + SHA-256 hashed (never stored in plaintext); the session
+  token lives in SecureStore. Synthetic data only.
+
+### Demo accounts
+
+Seeded automatically on first launch (all password `demo1234`):
+
+| Name   | Email                 | Purposes                          |
+| ------ | --------------------- | --------------------------------- |
+| Alex   | alex@flexbank.demo    | Saving, Fixed Deposits            |
+| Jamie  | jamie@flexbank.demo   | Bonds & Investments, Learning     |
+| Taylor | taylor@flexbank.demo  | Everyday, Managing (High Clarity) |
+
+In development the login screen shows one-tap "Sign in as …" buttons. Reset the
+local store with `resetDemoData()` from `@/services`.
+
+---
+
 ## Project structure
 
 ```
@@ -57,9 +88,11 @@ src/
     paynow/       Dev B — PayNow transfer journey
     concierge/    Dev C — AI concierge (deterministic fallback for now)
     safety/       Dev D — checkpoints, human assistance, error recovery
+    auth/         Login, multi-step registration, forgot-password
     demo/         Dev-only persona switcher
+  services/       Auth + persistence (local-first; swappable — see BACKEND.md)
   state/          Global session state (Context + useReducer + typed actions)
-  data/           Synthetic mock data (accounts, recipients, personas)
+  data/           Synthetic mock data (accounts, recipients, personas, demo users)
   types/          Shared domain types + feature contracts
   theme/          Design system (colors, typography, spacing, ThemeProvider)
   utils/          Small shared helpers (formatters)

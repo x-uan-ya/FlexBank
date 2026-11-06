@@ -4,70 +4,77 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Icon } from '@/components';
-import { usePreferences } from '@/state';
+import { useAuthState, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 
 import {
-  AccountsSection,
-  CategoryTabs,
-  GoalsSection,
-  QuickActionsPanel,
-  SecuritySection,
-  SpendingSection,
-  TransactionsSection,
-} from '../components/HomeSections';
-import { getHomeConfig, type HomeSection } from '../personalisationRules';
+  AccountsCards,
+  BondsSection,
+  EverydaySection,
+  FixedDepositsSection,
+  LearningSection,
+  ManagingSection,
+  QuickActions,
+  SavingsSection,
+  SecurityTipsSection,
+} from '../components/PurposeSections';
+import { getPurposeHome, type PurposeSection } from '../purposeEngine';
 
 /**
- * Adaptive banking home (Developer A / UI lead).
+ * Purpose-based personalised home.
  *
- * The screen is a thin composer: it reads the deterministic HomeConfig from the
- * customer's explicit preferences and renders sections in the chosen order.
- * Section components are presentational; ordering/verbosity lives in the rules
- * module. Changing preferences visibly re-arranges and re-words this screen.
+ * Reads the customer's EXPLICIT banking purposes and renders home sections in
+ * the order chosen by the pure `purposeEngine`. Each personalised section can
+ * reveal a "Why am I seeing this?" explanation, so the personalisation is
+ * transparent. No feature is hidden; security stays visible.
  */
 export function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const prefs = usePreferences();
+  const { user } = useAuthState();
 
-  const config = useMemo(() => getHomeConfig(prefs), [prefs]);
-
+  const home = useMemo(() => getPurposeHome(prefs), [prefs]);
   const [balanceHidden, setBalanceHidden] = useState(true);
-  const [category, setCategory] = useState('overview');
 
-  const sectionProps = {
-    config,
-    balanceHidden,
-    onToggleBalance: () => setBalanceHidden((h) => !h),
+  const toggleBalance = () => setBalanceHidden((h) => !h);
+
+  const sectionTitle: Record<PurposeSection, string> = {
+    quickActions: 'Quick actions',
+    accounts: 'Your accounts',
+    savings: 'Saving money',
+    fixedDeposits: 'Fixed deposits',
+    bonds: 'Bonds & investments',
+    everyday: 'Everyday banking',
+    managing: 'Managing my money',
+    learning: 'Learning',
+    security: 'Stay safe',
   };
 
-  const renderSection = (section: HomeSection) => {
+  function renderBody(section: PurposeSection) {
     switch (section) {
       case 'quickActions':
-        return (
-          <QuickActionsPanel
-            key={section}
-            {...sectionProps}
-            overlap={config.sectionOrder[0] === 'quickActions'}
-          />
-        );
-      case 'categories':
-        return <CategoryTabs key={section} active={category} onChange={setCategory} />;
+        return <QuickActions overlap={home.sections[0] === 'quickActions'} />;
       case 'accounts':
-        return <AccountsSection key={section} {...sectionProps} />;
-      case 'spending':
-        return <SpendingSection key={section} {...sectionProps} />;
-      case 'goals':
-        return <GoalsSection key={section} {...sectionProps} />;
-      case 'transactions':
-        return <TransactionsSection key={section} {...sectionProps} />;
+        return <AccountsCards balanceHidden={balanceHidden} onToggleBalance={toggleBalance} />;
+      case 'savings':
+        return <SavingsSection balanceHidden={balanceHidden} />;
+      case 'fixedDeposits':
+        return <FixedDepositsSection balanceHidden={balanceHidden} />;
+      case 'bonds':
+        return <BondsSection balanceHidden={balanceHidden} />;
+      case 'everyday':
+        return <EverydaySection balanceHidden={balanceHidden} />;
+      case 'managing':
+        return <ManagingSection balanceHidden={balanceHidden} />;
+      case 'learning':
+        return <LearningSection />;
       case 'security':
-        return <SecuritySection key={section} {...sectionProps} />;
+        return <SecurityTipsSection />;
       default:
         return null;
     }
-  };
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -75,7 +82,7 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: theme.spacing.xxl }}
       >
-        {/* Hero (also hosts the top bar so it sits on the coloured band). */}
+        {/* Hero band with top bar + greeting. */}
         <View
           style={{
             backgroundColor: theme.colors.hero,
@@ -87,20 +94,94 @@ export function HomeScreen() {
           }}
         >
           <TopBar />
-          <HeroGreeting highlightAccessibility={config.highlightAccessibility} />
+          <HeroGreeting name={user?.fullName} />
         </View>
 
-        {/* Body — sections in personalised order. The first section (quick
-            actions) overlaps the hero via a negative margin for the floating
-            panel effect. */}
+        {/* Personalised sections. QuickActions floats over the hero when first. */}
         <View style={{ paddingHorizontal: theme.spacing.md, gap: theme.spacing.lg }}>
-          {config.sectionOrder.map(renderSection)}
+          {home.sections.map((section, index) => {
+            const isQuickFirst = section === 'quickActions' && index === 0;
+            return (
+              <SectionShell
+                key={section}
+                title={section === 'quickActions' ? undefined : sectionTitle[section]}
+                why={home.explanations[section]}
+                flush={isQuickFirst}
+              >
+                {renderBody(section)}
+              </SectionShell>
+            );
+          })}
 
           <AppText role="caption" color="textMuted" center>
             Synthetic demo data • FlexBank is not affiliated with any bank.
           </AppText>
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Wraps a section with an optional title and a "Why am I seeing this?" toggle
+ * that reveals the explanation from the purpose engine.
+ */
+function SectionShell({
+  title,
+  why,
+  flush,
+  children,
+}: {
+  title?: string;
+  why?: string;
+  flush?: boolean;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+  const [showWhy, setShowWhy] = useState(false);
+
+  return (
+    <View style={{ gap: theme.spacing.sm, marginTop: flush ? 0 : undefined }}>
+      {title ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <AppText role="heading" style={{ flex: 1 }}>
+            {title}
+          </AppText>
+          {why ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Why am I seeing this?"
+              onPress={() => setShowWhy((s) => !s)}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="info" size={15} color={theme.colors.accent} />
+              <AppText role="caption" color="accent">
+                Why?
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {showWhy && why ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: theme.spacing.sm,
+            backgroundColor: theme.colors.accentSoft,
+            borderRadius: theme.radius.md,
+            padding: theme.spacing.sm,
+          }}
+        >
+          <Icon name="info" size={15} color={theme.colors.accent} />
+          <AppText role="caption" color="textSecondary" style={{ flex: 1 }}>
+            {why}
+          </AppText>
+        </View>
+      ) : null}
+
+      {children}
     </View>
   );
 }
@@ -197,10 +278,10 @@ function HeroIconButton({
   );
 }
 
-function HeroGreeting({ highlightAccessibility }: { highlightAccessibility: boolean }) {
+function HeroGreeting({ name }: { name?: string }) {
   const theme = useTheme();
-  const router = useRouter();
   const greeting = timeGreeting();
+  const firstName = name?.split(' ')[0];
 
   return (
     <View style={{ gap: theme.spacing.xs }}>
@@ -208,35 +289,11 @@ function HeroGreeting({ highlightAccessibility }: { highlightAccessibility: bool
         {greeting}
       </AppText>
       <AppText role="title" style={{ color: theme.colors.onHero }}>
-        Welcome back
+        {firstName ? `Welcome back, ${firstName}` : 'Welcome back'}
       </AppText>
       <AppText role="body" style={{ color: theme.colors.heroArtTint }}>
         Here is your money at a glance.
       </AppText>
-
-      {highlightAccessibility ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open accessibility and display settings"
-          onPress={() => router.push('/settings')}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            alignSelf: 'flex-start',
-            marginTop: theme.spacing.sm,
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            paddingVertical: 6,
-            paddingHorizontal: theme.spacing.sm,
-            borderRadius: theme.radius.pill,
-          }}
-        >
-          <Icon name="settings" size={14} color={theme.colors.onHero} />
-          <AppText role="label" style={{ color: theme.colors.onHero }}>
-            Display & accessibility
-          </AppText>
-        </Pressable>
-      ) : null}
     </View>
   );
 }

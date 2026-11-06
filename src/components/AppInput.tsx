@@ -4,6 +4,7 @@ import {
   View,
   type TextInputProps,
   type TextStyle,
+  type ViewStyle,
 } from 'react-native';
 
 import { useTheme } from '@/theme';
@@ -22,12 +23,15 @@ interface AppInputProps extends TextInputProps {
   /** Customer-friendly error message (never raw errors). */
   error?: string;
   hint?: string;
+  /** Optional element rendered inside the field, right-aligned (e.g. show/hide). */
+  rightAccessory?: React.ReactNode;
 }
 
 export function AppInput({
   label,
   error,
   hint,
+  rightAccessory,
   style,
   onFocus,
   onBlur,
@@ -43,13 +47,19 @@ export function AppInput({
       : theme.colors.border;
 
   const inputStyle: TextStyle = {
-    borderWidth: 1,
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    minHeight: 48,
+  };
+
+  const fieldWrap: ViewStyle = {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: theme.clarity ? 2 : 1,
     borderColor,
     borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     backgroundColor: theme.colors.surface,
-    minHeight: 48,
   };
 
   return (
@@ -60,24 +70,27 @@ export function AppInput({
         </AppText>
       ) : null}
 
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={theme.colors.textMuted}
-        style={[
-          inputStyle,
-          { ...theme.typography.body, color: theme.colors.textPrimary },
-          style,
-        ]}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        {...rest}
-      />
+      <View style={fieldWrap}>
+        <TextInput
+          accessibilityLabel={label}
+          placeholderTextColor={theme.colors.textMuted}
+          style={[
+            inputStyle,
+            { ...theme.typography.body, color: theme.colors.textPrimary },
+            style,
+          ]}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          {...rest}
+        />
+        {rightAccessory ? <View style={{ marginLeft: theme.spacing.sm }}>{rightAccessory}</View> : null}
+      </View>
 
       {error ? (
         <AppText role="caption" color="danger" accessibilityLiveRegion="polite">
