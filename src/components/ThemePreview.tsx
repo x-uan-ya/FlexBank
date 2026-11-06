@@ -1,10 +1,12 @@
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import type { KeyboardEvent } from 'react';
 
 import { getColors, useTheme } from '@/theme';
 import type { VisualTheme } from '@/types/preferences';
 
 import { AppText } from './AppText';
 import { Icon } from './Icon';
+import { selectionKeyboard } from './selectionKeyboard';
 
 /**
  * A small visual preview swatch for a VisualTheme, used in onboarding/settings.
@@ -22,6 +24,7 @@ interface ThemePreviewProps {
   description?: string;
   selected: boolean;
   onPress: () => void;
+  roving?: boolean;
 }
 
 export function ThemePreview({
@@ -30,6 +33,7 @@ export function ThemePreview({
   description,
   selected,
   onPress,
+  roving = false,
 }: ThemePreviewProps) {
   const t = useTheme();
   // Preview always shows the target theme's own colours (standard display).
@@ -38,10 +42,15 @@ export function ThemePreview({
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={`${label} theme`}
       accessibilityHint={description}
       onPress={onPress}
+      {...(Platform.OS === 'web' ? {
+        ...(roving ? { tabIndex: selected ? 0 as const : -1 as const } : {}),
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => selectionKeyboard(event, onPress),
+      } : {})}
       style={({ pressed }) => [
         {
           width: 132,

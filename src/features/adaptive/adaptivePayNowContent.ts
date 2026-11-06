@@ -41,11 +41,11 @@ export const PAYNOW_START_CONTENT: Record<GuidanceLevel, StartContent> = {
   },
   balanced: {
     title: 'How it works',
-    body: 'Choose who to pay, enter an amount, review the details, then confirm. You will always see a summary before anything is sent. This is a simulation using synthetic data.',
+    body: 'Check all the details on Review before choosing Confirm and send.',
   },
   guided: {
     title: 'How PayNow works',
-    body: 'We will guide you through each required step. Nothing is sent until you review the details and press Confirm and send.',
+    body: 'A mobile number helps you find the right person. Next, choose your recipient. We will explain each step before you review and confirm.',
     steps: [
       'Choose a saved recipient, or find and select one from the demo mobile directory.',
       'Enter the amount in Singapore dollars.',

@@ -58,7 +58,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   })()`);
   const navigate = async route => {
     await send('Page.navigate', { url: 'http://localhost:8087' + route });
-    const label = route === '/customize' ? 'Make payments quickly' : route === '/home' ? 'Hide account balance' : 'Start a PayNow transfer';
+    const label = route === '/customize' ? 'Make payments quickly' : route === '/home' ? 'Hide account balance' : 'Continue to recipient';
     await wait(`!!${control(label)}`);
     await wait(`Object.keys(${control(label)}).some(key => key.startsWith('__reactProps$'))`);
     await delay(200);
@@ -240,8 +240,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   // One complete reviewed draft, followed by real in-app personalisation actions.
   await navigate('/home'); await click('PayNow'); await wait(`location.pathname === '/paynow'`);
-  await click('Start a PayNow transfer'); await wait(`location.pathname === '/paynow/recipient'`);
-  await click('Pay Alex Tan at DBS'); await wait(`location.pathname === '/paynow/amount'`);
+  await click('Continue to recipient'); await wait(`location.pathname === '/paynow/recipient'`);
+  await click('Pay Alex Tan at DBS'); await click('Continue to amount'); await wait(`location.pathname === '/paynow/amount'`);
   const input = `document.querySelector('input[aria-label="Amount (SGD)"]')`;
   await evaluate(`${input}.focus()`); await send('Input.insertText',{text:'50'}); await delay(100);
   await click('Review transfer'); await wait(`location.pathname === '/paynow/review'`);

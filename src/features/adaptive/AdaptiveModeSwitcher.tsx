@@ -1,5 +1,7 @@
+import { useRef, type KeyboardEvent } from 'react';
 import {
   AccessibilityInfo,
+  Platform,
   Pressable,
   View,
   type ViewStyle,
@@ -33,6 +35,7 @@ export function AdaptiveModeSwitcher({
   const theme = useTheme();
   const preferences = usePreferences();
   const dispatch = useAppDispatch();
+  const options = useRef<Array<View | null>>([]);
 
   function selectMode(guidanceLevel: GuidanceLevel) {
     if (guidanceLevel === preferences.guidanceLevel) return;
@@ -56,7 +59,7 @@ export function AdaptiveModeSwitcher({
             gap: theme.spacing.sm,
           }}
         >
-          {GUIDANCE_LEVELS.map((level) => {
+          {GUIDANCE_LEVELS.map((level, index) => {
             const selected = preferences.guidanceLevel === level;
             const optionStyle: ViewStyle = {
               flexGrow: 1,
@@ -83,7 +86,22 @@ export function AdaptiveModeSwitcher({
                 accessibilityLabel={`${GUIDANCE_LABELS[level]} mode`}
                 accessibilityHint="Changes how much guidance the interface shows"
                 accessibilityState={{ checked: selected, selected }}
+                aria-checked={selected}
                 onPress={() => selectMode(level)}
+                {...(Platform.OS === 'web' ? {
+                  ref: (node: View | null) => { options.current[index] = node; },
+                  tabIndex: selected ? 0 as const : -1 as const,
+                  onKeyDown: (event: KeyboardEvent) => {
+                    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % GUIDANCE_LEVELS.length
+                      : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + GUIDANCE_LEVELS.length - 1) % GUIDANCE_LEVELS.length
+                      : event.key === 'Home' ? 0 : event.key === 'End' ? GUIDANCE_LEVELS.length - 1
+                      : event.key === ' ' ? index : undefined;
+                    if (next === undefined) return;
+                    event.preventDefault();
+                    selectMode(GUIDANCE_LEVELS[next]);
+                    options.current[next]?.focus();
+                  },
+                } : {})}
                 style={({ pressed }) => [
                   optionStyle,
                   pressed ? { opacity: 0.85 } : null,

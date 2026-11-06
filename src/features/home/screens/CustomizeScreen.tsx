@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { AccessibilityInfo, Platform, Pressable, View, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppButton, AppCard, AppText, Header, ScreenContainer } from '@/components';
 import {
@@ -12,6 +12,7 @@ import { useAppDispatch, useHomeLayout, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import { DEFAULT_HOME_LAYOUT, type HomeWidget } from '@/types/home';
 import { GUIDANCE_LABELS, type Priority } from '@/types/preferences';
+import { bankingReturnRoute } from '@/utils/bankingNavigation';
 
 import { HomeIcon } from '../components/HomeIcon';
 
@@ -31,6 +32,7 @@ export function CustomizeScreen() {
   const dispatch = useAppDispatch();
   const layout = useHomeLayout();
   const preferences = usePreferences();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { width, fontScale } = useWindowDimensions();
   const [manualOpen, setManualOpen] = useState(false);
   const [status, setStatus] = useState('');
@@ -102,8 +104,7 @@ export function CustomizeScreen() {
   }
 
   function goBack() {
-    if (router.canGoBack()) router.back();
-    else router.replace('/home');
+    router.replace(bankingReturnRoute(returnTo));
   }
 
   return (
@@ -228,7 +229,7 @@ export function CustomizeScreen() {
         ) : null}
         </HomeRecommendationPanel>
 
-        <AppButton label="More preferences in Settings" variant="ghost" onPress={() => router.push('/settings')}
+        <AppButton label="More preferences in Settings" variant="ghost" onPress={() => router.push({ pathname: '/settings', params: { returnTo: '/customize' } })}
           accessibilityHint="Opens display, language and other preferences" />
       </View>
     </ScreenContainer>

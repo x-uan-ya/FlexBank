@@ -38,6 +38,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   };
   const input = label => `([...document.querySelectorAll('input')].reverse().find(e => !e.closest('[aria-hidden="true"]') && e.getBoundingClientRect().width > 0 && e.getAttribute('aria-label') === ${JSON.stringify(label)}))`;
   const type = async (label, value) => {
+    if (label === 'PayNow mobile number' && !await evaluate(`!!${input(label)}`)) await click('Look up a mobile number');
     const expression = input(label); await wait(`!!${expression}`);
     await evaluate(`${expression}.focus(); ${expression}.select()`);
     await send('Input.insertText', { text: value });
@@ -45,7 +46,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   };
   const bodyHas = text => `!!document.body && document.body.innerText.includes(${JSON.stringify(text)})`;
   const disabled = async label => evaluate(`!!(${control(label)}.disabled || ${control(label)}.getAttribute('aria-disabled') === 'true')`);
-  const dir = path.join(process.cwd(), 'artifacts', 'paynow-integration-2026-11-06');
+  const output = process.argv.find(arg => arg.startsWith('--output='))?.slice('--output='.length);
+  const dir = path.join(process.cwd(), output ?? 'artifacts/paynow-integration-2026-11-06');
   fs.mkdirSync(dir, { recursive: true });
   const report = { source: { member2: '84026a8', member3: 'cc99ea5' }, viewportHeight: 900, cases: [], additional: [] };
   const screenshot = async name => {
@@ -73,16 +75,20 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     return metrics;
   };
   const modes = async (guidance, display) => {
+    const panel = `([...document.querySelectorAll('[role="button"]')].reverse().find(e => !e.closest('[aria-hidden="true"]') && e.getAttribute('aria-label')?.startsWith('Banking preferences, ')))`;
+    const panelClosed = await evaluate(`!!${panel} && ${panel}.getAttribute('aria-expanded') !== 'true'`);
+    if (panelClosed) { await evaluate(`${panel}.click()`); await delay(80); }
     await click({ quick: 'Quick mode', balanced: 'Balanced mode', guided: 'Guided mode' }[guidance]);
     const readability = `([...document.querySelectorAll('[role="button"]')].reverse().find(e => !e.closest('[aria-hidden="true"]') && e.getAttribute('aria-label')?.startsWith('Readability, ')))`;
     await wait(`!!${readability}`);
     if (!await evaluate(`${readability}.getAttribute('aria-expanded') === 'true'`)) { await evaluate(`${readability}.click()`); await delay(80); }
     await click({ standard: 'Standard', largeText: 'Large text', highClarity: 'High clarity' }[display]);
     await evaluate(`${readability}.click()`); await delay(100);
+    if (panelClosed) { await evaluate(`${panel}.click()`); await delay(80); }
   };
   const load = async route => {
     await send('Page.navigate', { url: 'http://localhost:8087' + route });
-    await wait(`!!${control(route === '/paynow' ? 'Start a PayNow transfer' : 'Confirm and send')} || ${bodyHas('The transfer was not confirmed.')}`);
+    await wait(`!!${control(route === '/paynow' ? 'Continue to recipient' : 'Confirm and send')} || ${bodyHas('The transfer was not confirmed.')}`);
     await wait(`Object.keys(document.querySelector('[role="button"]')).some(key => key.startsWith('__reactProps$'))`);
     await delay(250);
   };
@@ -103,8 +109,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   if (process.argv.includes('--extras')) {
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 900, deviceScaleFactor: 1, mobile: true });
-    await load('/paynow'); await modes('balanced', 'largeText'); await click('Start a PayNow transfer');
-    await wait(`location.pathname === '/paynow/recipient'`); await click('Pay Alex Tan at DBS'); await wait(`location.pathname === '/paynow/amount'`);
+    await load('/paynow'); await modes('balanced', 'largeText'); await click('Continue to recipient');
+    await wait(`location.pathname === '/paynow/recipient'`); await click('Pay Alex Tan at DBS'); await click('Continue to amount'); await wait(`location.pathname === '/paynow/amount'`);
     await type('Amount (SGD)', '1.000'); await click('Review transfer'); await wait(bodyHas('Use at most 2 decimal places'));
     assert.equal(await evaluate('location.pathname'), '/paynow/amount');
     await type('Amount (SGD)', '-5'); await click('Review transfer'); await wait(bodyHas('one decimal point'));
@@ -129,7 +135,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const evidence = { name, screens: {} };
     console.log('Running ' + name);
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: true });
-    await load('/paynow'); await modes(guidance, display); await click('Start a PayNow transfer');
+    await load('/paynow'); await modes(guidance, display); await click('Continue to recipient');
     await wait(`location.pathname === '/paynow/recipient'`);
     await type('PayNow mobile number', '123'); await click('Find recipient'); await wait(bodyHas('8-digit Singapore mobile'));
     // Mode controls must not remount local lookup/error state.
@@ -141,7 +147,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await scroll(true); evidence.screens.lookupError = await capture(name + '-recipient-error');
     await type('PayNow mobile number', '+65 9000-4821'); await click('Find recipient'); await wait(`!!${control('Use Alex Tan as recipient')}`);
     assert.equal(await evaluate('location.pathname'), '/paynow/recipient', 'Lookup must not select automatically');
-    await click('Use Alex Tan as recipient'); await wait(`location.pathname === '/paynow/amount'`);
+    await click('Use Alex Tan as recipient'); await click('Continue to amount'); await wait(`location.pathname === '/paynow/amount'`);
     await type('Amount (SGD)', '13.');
     await modes(guidance === 'quick' ? 'guided' : 'quick', display === 'standard' ? 'highClarity' : 'standard');
     assert.equal(await evaluate(`${input('Amount (SGD)')}.value`), '13.');
@@ -175,8 +181,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await capture('direct-empty-review'); report.additional.push('Empty direct Review cannot confirm');
   await load('/paynow/success'); assert.equal(await evaluate(bodyHas('Transfer receipt')), false); await capture('direct-empty-outcome');
   report.additional.push('Empty direct Success cannot show receipt');
-  await load('/paynow'); await click('Start a PayNow transfer'); await wait(`location.pathname === '/paynow/recipient'`);
-  await click('Pay Alex Tan at DBS'); await wait(`location.pathname === '/paynow/amount'`); await type('Amount (SGD)', '50');
+  await load('/paynow'); await click('Continue to recipient'); await wait(`location.pathname === '/paynow/recipient'`);
+  await click('Pay Alex Tan at DBS'); await click('Continue to amount'); await wait(`location.pathname === '/paynow/amount'`); await type('Amount (SGD)', '50');
   await click('Review transfer'); await wait(`location.pathname === '/paynow/review'`); await click('Edit details'); await wait(`location.pathname === '/paynow/amount'`);
   assert.equal(await evaluate(`${input('Amount (SGD)')}.value`), '50'); await click('Review transfer'); await wait(`location.pathname === '/paynow/review'`);
   assert.equal(await disabled('Confirm and send'), false); report.additional.push('Unchanged amount does not force re-review');

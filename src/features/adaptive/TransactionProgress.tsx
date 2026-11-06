@@ -14,13 +14,16 @@ const STEPS: { id: PayNowProgressStep; label: string }[] = [
 
 interface TransactionProgressProps {
   currentStep: PayNowProgressStep;
+  heading?: string;
+  completionLabel?: string;
+  wrapInPairs?: boolean;
 }
 
 /** Compact PayNow progress that wraps safely on narrow screens. */
-export function TransactionProgress({ currentStep }: TransactionProgressProps) {
+export function TransactionProgress({ currentStep, heading = 'Your progress', completionLabel = 'Complete', wrapInPairs = false }: TransactionProgressProps) {
   const theme = useTheme();
   const currentIndex = STEPS.findIndex((step) => step.id === currentStep);
-  const currentLabel = STEPS[currentIndex]?.label ?? 'Recipient';
+  const currentLabel = currentStep === 'complete' ? completionLabel : STEPS[currentIndex]?.label ?? 'Recipient';
 
   return (
     <View
@@ -28,7 +31,7 @@ export function TransactionProgress({ currentStep }: TransactionProgressProps) {
       accessibilityLabel={`PayNow progress: ${currentLabel}, step ${currentIndex + 1} of ${STEPS.length}`}
       style={{ gap: theme.spacing.xs }}
     >
-      <AppText role="label">Your progress</AppText>
+      <AppText role="label">{heading}</AppText>
       <View
         style={{
           flexDirection: 'row',
@@ -44,7 +47,8 @@ export function TransactionProgress({ currentStep }: TransactionProgressProps) {
               key={step.id}
               style={{
                 flexGrow: 1,
-                flexBasis: theme.mode === 'standard' ? 104 : 140,
+                flexBasis: wrapInPairs ? '45%' : theme.mode === 'standard' ? 104 : 140,
+                minWidth: wrapInPairs ? theme.mode === 'standard' ? 104 : 140 : undefined,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.xs,
@@ -83,7 +87,7 @@ export function TransactionProgress({ currentStep }: TransactionProgressProps) {
                 color={active ? 'primary' : 'textSecondary'}
                 style={{ flexShrink: 1 }}
               >
-                {step.label}
+                {step.id === 'complete' ? completionLabel : step.label}
               </AppText>
             </View>
           );

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import {
   AccessibilityInfo,
+  Platform,
   Pressable,
   View,
   type ViewStyle,
@@ -20,11 +21,12 @@ const DISPLAY_MODES: DisplayMode[] = ['standard', 'largeText', 'highClarity'];
  * Compact, expandable display preference control for use during transactions.
  * It changes presentation only and has no navigation or PayNow dependencies.
  */
-export function ReadabilityModeSwitcher() {
+export function ReadabilityModeSwitcher({ initiallyExpanded = false }: { initiallyExpanded?: boolean } = {}) {
   const theme = useTheme();
   const preferences = usePreferences();
   const dispatch = useAppDispatch();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const options = useRef<Array<View | null>>([]);
 
   function selectMode(displayMode: DisplayMode) {
     if (displayMode === preferences.displayMode) return;
@@ -42,6 +44,7 @@ export function ReadabilityModeSwitcher() {
           accessibilityLabel={`Readability, ${DISPLAY_MODE_LABELS[preferences.displayMode]}`}
           accessibilityHint={expanded ? 'Hides display options' : 'Shows display options'}
           accessibilityState={{ expanded }}
+          aria-expanded={expanded}
           onPress={() => setExpanded((value) => !value)}
           style={({ pressed }) => ({
             minHeight: 48,
@@ -74,7 +77,7 @@ export function ReadabilityModeSwitcher() {
               gap: theme.spacing.sm,
             }}
           >
-            {DISPLAY_MODES.map((mode) => {
+            {DISPLAY_MODES.map((mode, index) => {
               const selected = preferences.displayMode === mode;
               const optionStyle: ViewStyle = {
                 flexGrow: 1,
@@ -101,7 +104,22 @@ export function ReadabilityModeSwitcher() {
                   accessibilityLabel={DISPLAY_MODE_LABELS[mode]}
                   accessibilityHint="Changes text size, spacing and visual clarity"
                   accessibilityState={{ checked: selected, selected }}
+                  aria-checked={selected}
                   onPress={() => selectMode(mode)}
+                  {...(Platform.OS === 'web' ? {
+                    ref: (node: View | null) => { options.current[index] = node; },
+                    tabIndex: selected ? 0 as const : -1 as const,
+                    onKeyDown: (event: KeyboardEvent) => {
+                      const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % DISPLAY_MODES.length
+                        : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + DISPLAY_MODES.length - 1) % DISPLAY_MODES.length
+                        : event.key === 'Home' ? 0 : event.key === 'End' ? DISPLAY_MODES.length - 1
+                        : event.key === ' ' ? index : undefined;
+                      if (next === undefined) return;
+                      event.preventDefault();
+                      selectMode(DISPLAY_MODES[next]);
+                      options.current[next]?.focus();
+                    },
+                  } : {})}
                   style={({ pressed }) => [
                     optionStyle,
                     pressed ? { opacity: 0.85 } : null,

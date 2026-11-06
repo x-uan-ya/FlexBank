@@ -1,158 +1,69 @@
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import {
-  AppButton,
-  AppCard,
-  AppText,
-  ScreenContainer,
-} from '@/components';
-import {
-  AdaptiveModeSwitcher,
-  GuidancePanel,
-  PAYNOW_SUCCESS_CONTENT,
-  ReadabilityModeSwitcher,
-  TransactionProgress,
-} from '@/features/adaptive';
+import { AppButton, AppCard, AppText } from '@/components';
+import { BankingDemoNotice, BankingScreen } from '@/components/BankingScreen';
+import { GuidancePanel, PAYNOW_SUCCESS_CONTENT, TransactionProgress } from '@/features/adaptive';
+import { BankingPreferencesPanel } from '@/features/adaptive/BankingPreferencesPanel';
 import { usePreferences, useTransaction } from '@/state';
 import { useTheme } from '@/theme';
-import { formatMoney, makeReference } from '@/utils';
+import { makeReference } from '@/utils';
+
+import { TransferSummary } from '../components/TransferSummary';
 import { canShowSuccessfulReceipt, validateTransaction } from '../validation';
 
-/**
- * Confirmation / success (Developer B). Shows a calm success summary with a
- * synthetic reference. Reached only after an explicit confirm.
- */
+/** Existing outcome/receipt guards and mounted reference lifetime are retained. */
 export function SuccessScreen() {
   const theme = useTheme();
   const router = useRouter();
   const draft = useTransaction();
   const preferences = usePreferences();
   const content = PAYNOW_SUCCESS_CONTENT[preferences.guidanceLevel];
-
   const confirmed = canShowSuccessfulReceipt(draft);
   const failed = draft.status === 'failed' && validateTransaction(draft).valid;
   const [reference] = useState(() => makeReference());
+  const title = confirmed ? 'Transfer completed' : 'Transfer not completed';
+  const body = confirmed ? content.confirmedBody : failed
+    ? preferences.guidanceLevel === 'quick' ? content.failedBody : draft.failureReason ?? content.failedBody
+    : 'This transfer has not been confirmed. Return to PayNow to start or resume your details.';
 
-  return (
-    <ScreenContainer
-      footer={
-        <View style={{ gap: theme.spacing.sm }}>
-          {failed ? (
-            <>
-              <AppButton
-                label="Edit details and try again"
-                onPress={() => router.replace('/paynow/amount')}
-                accessibilityHint="Returns to edit the saved amount before reviewing again"
-              />
-              <AppButton label="Ask for help" variant="secondary" onPress={() => router.push('/human-assistance')} />
-            </>
-          ) : null}
-          <AppButton
-            label="Done — back to home"
-            variant={failed ? 'ghost' : 'primary'}
-            onPress={() => router.replace('/home')}
-          />
-        </View>
-      }
-    >
-      <View style={{ alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xl }}>
-        <View
-          style={{
-            width: theme.mode === 'standard' ? 72 : 84,
-            height: theme.mode === 'standard' ? 72 : 84,
-            borderRadius: theme.radius.pill,
-            backgroundColor: confirmed ? theme.colors.successSoft : failed ? theme.colors.dangerSoft : theme.colors.warningSoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <AppText role="display" color={confirmed ? 'success' : failed ? 'danger' : 'warning'}>
-            {confirmed ? '✓' : '!'}
-          </AppText>
-        </View>
-        <AppText role="title" center>
-          {confirmed ? content.title : failed ? content.failedTitle : 'Transfer not completed'}
-        </AppText>
-        <AppText role="body" color="textSecondary" center accessibilityLiveRegion="polite">
-          {confirmed
-            ? content.confirmedBody
-            : failed
-              ? preferences.guidanceLevel === 'quick' ? content.failedBody : draft.failureReason ?? content.failedBody
-              : 'The transfer was not confirmed. Start a new transfer from PayNow to continue.'}
-        </AppText>
+  useEffect(() => {
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(title + '. Demo only. No real money moved.');
+  }, [title]);
+
+  return <BankingScreen title="PayNow" backTo="/home">
+    <View style={{ gap: theme.spacing.sm }} accessibilityLiveRegion="polite">
+      <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+        style={{ minWidth: 48, minHeight: 48, alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center',
+          borderRadius: theme.radius.pill, padding: theme.spacing.sm,
+          backgroundColor: confirmed ? theme.colors.successSoft : failed ? theme.colors.dangerSoft : theme.colors.warningSoft }}>
+        <AppText role="title" color={confirmed ? 'success' : failed ? 'danger' : 'warning'}>{confirmed ? '✓' : '!'}</AppText>
       </View>
-
-      <AdaptiveModeSwitcher />
-      <ReadabilityModeSwitcher />
-
-      {confirmed ? <TransactionProgress currentStep="complete" /> : null}
-
-      {confirmed && preferences.guidanceLevel === 'guided' ? (
-        <GuidancePanel
-          title="What happens next?"
-          items={content.nextSteps}
-        />
-      ) : null}
-
-      {failed && preferences.guidanceLevel === 'guided' ? (
-        <GuidancePanel title="You can recover without starting over" body={content.failedBody} items={content.retrySteps} />
-      ) : null}
-
-      {confirmed ? (
-        <AppCard>
-          <AppText role="subheading">Transfer receipt</AppText>
-          <View style={{ height: theme.spacing.sm }} />
-          <Row label="Paid" value={draft.recipientName ?? '—'} />
-          <Divider />
-          <Row
-            label="Amount"
-            value={draft.amount !== undefined ? formatMoney(draft.amount, draft.currency) : '—'}
-          />
-          <Divider />
-          <Row label="Reference" value={reference} />
-        </AppCard>
-      ) : null}
-
-      <AppText role="caption" color="textSecondary" center>
-        Synthetic demo only. No actual bank transfer or movement of money occurred.
-      </AppText>
-    </ScreenContainer>
-  );
-}
-
-function Divider() {
-  const theme = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.colors.border }} />;
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  const theme = useTheme();
-  const stacked = theme.mode !== 'standard';
-  return (
-    <View
-      style={{
-        flexDirection: stacked ? 'column' : 'row',
-        justifyContent: stacked ? 'flex-start' : 'space-between',
-        alignItems: stacked ? 'flex-start' : 'center',
-        paddingVertical: theme.spacing.xs,
-        gap: stacked ? theme.spacing.xs : theme.spacing.md,
-      }}
-    >
-      <AppText role="body" color="textSecondary">
-        {label}
-      </AppText>
-      <AppText
-        role="bodyStrong"
-        style={{
-          flexShrink: 1,
-          textAlign: stacked ? 'left' : 'right',
-          alignSelf: stacked ? 'stretch' : 'auto',
-        }}
-      >
-        {value}
-      </AppText>
+      <AppText role="title" accessibilityRole="header">{title}</AppText>
+      <AppText color="textSecondary">{body}</AppText>
     </View>
-  );
+
+    {confirmed || failed ? <TransactionProgress currentStep={confirmed ? 'complete' : 'review'} completionLabel="Done" wrapInPairs /> : null}
+    <BankingPreferencesPanel />
+
+    {confirmed ? <TransferSummary draft={draft} reference={reference} title="Transfer receipt" /> :
+      failed ? <TransferSummary draft={draft} title="Saved transfer details" /> : <AppCard elevation="none">
+        <AppText color="textSecondary">A successful receipt is available only after a valid transfer is reviewed and explicitly confirmed.</AppText>
+      </AppCard>}
+
+    {preferences.guidanceLevel === 'guided' && (confirmed || failed) ? <GuidancePanel
+      title={confirmed ? 'What happens next?' : 'You can recover without starting over'}
+      items={confirmed ? content.nextSteps : content.retrySteps} /> : null}
+    <BankingDemoNotice text="Synthetic demo only. No actual bank transfer or movement of money occurred." />
+    <View style={{ gap: theme.spacing.sm }}>
+      {failed ? <>
+        <AppButton label="Edit details and try again" onPress={() => router.replace('/paynow/amount')}
+          accessibilityHint="Returns to the saved amount; you must review again before confirming" />
+        <AppButton label="Ask for help" variant="secondary" onPress={() => router.push({ pathname: '/human-assistance', params: { returnTo: '/paynow/success' } })} />
+      </> : null}
+      {!confirmed && !failed ? <AppButton label="Return to PayNow" variant="secondary" onPress={() => router.replace('/paynow')} /> : null}
+      <AppButton label="Done — back to home" variant={failed ? 'ghost' : 'primary'} onPress={() => router.replace('/home')} />
+    </View>
+  </BankingScreen>;
 }

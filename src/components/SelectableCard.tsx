@@ -1,9 +1,11 @@
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, View, type ViewStyle } from 'react-native';
+import type { KeyboardEvent } from 'react';
 
 import { useTheme } from '@/theme';
 
 import { AppText } from './AppText';
 import { Icon } from './Icon';
+import { selectionKeyboard } from './selectionKeyboard';
 
 /**
  * A polished selectable option card with a clear selected state.
@@ -51,9 +53,11 @@ export function SelectableCard({
     <Pressable
       accessibilityRole={control === 'radio' ? 'radio' : 'checkbox'}
       accessibilityState={{ selected, checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={title}
       accessibilityHint={description}
       onPress={onPress}
+      {...(Platform.OS === 'web' ? { onKeyDown: (event: KeyboardEvent<HTMLElement>) => selectionKeyboard(event, onPress) } : {})}
       style={({ pressed }) => [container, pressed ? { opacity: 0.9 } : null]}
     >
       {leading ? <View>{leading}</View> : null}
