@@ -71,8 +71,11 @@ export function ReviewScreen() {
     <ScreenContainer
       footer={
         <View style={{ gap: theme.spacing.sm }}>
-          {/* TODO: SAFETY FEATURE — Dev D: insert a Confidence Checkpoint here
-              (e.g. route to /checkpoint before confirm in guided mode). */}
+          <AppButton
+            label="Quick check before you confirm"
+            variant="secondary"
+            onPress={() => router.push('/checkpoint')}
+          />
           {!canConfirm && !needsReReview ? (
             <AppText role="caption" color="textSecondary" center>
               Go back and complete the recipient and amount to continue.
