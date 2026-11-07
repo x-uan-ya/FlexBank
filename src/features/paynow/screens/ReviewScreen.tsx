@@ -109,6 +109,12 @@ export function ReviewScreen() {
     </AppCard>
     <BankingDemoNotice />
     <View style={{ gap: theme.spacing.sm }}>
+      {/* Safety (Member 5): optional confidence checkpoint before confirming.
+          Never confirms — it only opens the pause-and-check screen. */}
+      <AppButton label="Quick check before you confirm" variant="secondary"
+        onPress={() => router.push({ pathname: '/checkpoint', params: { returnTo: '/paynow/review' } })}
+        disabled={terminal || submissionRequested}
+        accessibilityHint="Opens a pause-and-check screen; it never confirms the transfer" />
       <AppButton label="Confirm and send" onPress={confirm} disabled={!canConfirm || submissionRequested}
         loading={submissionRequested} accessibilityHint="Explicitly confirms the simulated transfer after all details have been reviewed" />
       <AppButton label="Edit details" variant="secondary" onPress={editDetails} disabled={terminal || submissionRequested}
