@@ -7,6 +7,7 @@ import { BankingScreen } from '@/components/BankingScreen';
 import { useTheme } from '@/theme';
 import { bankingReturnRoute } from '@/utils/bankingNavigation';
 import { concierge } from '../concierge';
+import { ConciergeChat } from '../components/ConciergeChat';
 
 /** Prepared demo explanations; the existing service contract stays read-only. */
 export function ConciergeScreen() {
@@ -50,6 +51,11 @@ export function ConciergeScreen() {
         {usedFallback ? <AppText role="caption" color="textSecondary">Prepared demo explanation.</AppText> : null}
       </View>
     </AppCard> : null}
+
+    {/* Multi-turn banking Q&A. Live AI when the proxy is configured; otherwise
+        a deterministic offline responder. Never moves money. */}
+    <ConciergeChat />
+
     <AppText role="caption" color="textSecondary">Concierge does not change recipients, amounts or review requirements, and never confirms a transfer.</AppText>
   </BankingScreen>;
 }

@@ -14,14 +14,33 @@
  */
 
 const DEFAULT_TIMEOUT_MS = 4000;
+// Chat may take longer than a short explanation; allow more headroom.
+const CHAT_TIMEOUT_MS = 12000;
 
 export type AiTask = 'explain' | 'simplify' | 'translate';
+
+export type GuidanceLevel = 'quick' | 'balanced' | 'guided';
 
 export interface AiRequest {
   task: AiTask;
   context?: string;
   text?: string;
   language?: string;
+  /** Optional: shapes answer length/detail. Backwards-compatible. */
+  guidanceLevel?: GuidanceLevel;
+}
+
+/** One prior turn of a multi-turn chat (client-held history). */
+export interface ChatTurn {
+  role: 'user' | 'model';
+  text: string;
+}
+
+export interface AiChatRequest {
+  question: string;
+  history?: ChatTurn[];
+  language?: string;
+  guidanceLevel?: GuidanceLevel;
 }
 
 function getEndpoint(): string | null {
@@ -82,6 +101,51 @@ export async function tryAiProvider(
     return body.text.trim();
   } catch {
     // Timeout, network error, abort, JSON parse failure — all treated as null.
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Attempts a bounded multi-turn chat call against the `/chat` sibling of the
+ * configured endpoint. Returns the reply text on success, or null on any
+ * failure (offline, timeout, non-OK status such as 503/429, bad shape), so the
+ * caller can fall back deterministically.
+ */
+export async function tryAiChat(
+  request: AiChatRequest,
+  timeoutMs: number = CHAT_TIMEOUT_MS,
+): Promise<string | null> {
+  const base = getEndpoint();
+  if (!base) {
+    return null;
+  }
+  // Derive the chat endpoint from the base (e.g. ".../concierge" → ".../concierge/chat").
+  const chatEndpoint = `${base.replace(/\/$/, '')}/chat`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(chatEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const body: unknown = await response.json();
+    if (!isValidResponse(body)) {
+      return null;
+    }
+
+    return body.text.trim();
+  } catch {
     return null;
   } finally {
     clearTimeout(timer);

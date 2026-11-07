@@ -17,7 +17,7 @@
 import type { ConciergeContract, ConciergeResponse } from '@/types/contracts';
 import { LANGUAGE_LABELS, type Language } from '@/types/preferences';
 
-import { tryAiProvider } from './provider/aiProvider';
+import { tryAiChat, tryAiProvider, type ChatTurn } from './provider/aiProvider';
 
 /** Plain-language explanations for known transfer contexts. */
 const EXPLANATIONS: Record<string, string> = {
@@ -232,3 +232,118 @@ export const CONCIERGE_CONTEXTS = [
 ] as const;
 
 export type ConciergeContext = (typeof CONCIERGE_CONTEXTS)[number];
+
+/* ------------------------------------------------------------------ *
+ * Multi-turn chat (banking education).
+ *
+ * Live AI is attempted via the backend proxy (`/concierge/chat`). When the
+ * proxy is unconfigured/unreachable/rate-limited, we fall back to a
+ * deterministic, offline topic responder so the Concierge always answers.
+ *
+ * SAFETY: a client-side guard mirrors the server so even in OFFLINE mode the
+ * Concierge refuses to act on money, never asks for credentials, and gives no
+ * personalised investment advice. This module never touches transfer state.
+ * ------------------------------------------------------------------ */
+
+export type ConciergeGuidance = 'quick' | 'balanced' | 'guided';
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
+/** Offline safety guard (mirrors server/src/safety.ts). */
+const CHAT_CREDENTIAL = /\b(password|passcode|otp|one[-\s]?time|pin|cvv|card number|account number|login|credential)\b/i;
+const CHAT_TRANSACTION = /\b(confirm|approve|authorise|authorize|execute|send|transfer|pay|cancel|move)\b[^.?!]{0,40}\b(my|the|this)\b[^.?!]{0,20}\b(transfer|payment|transaction|money|funds|fds?|fixed deposit)\b/i;
+const CHAT_ADVICE = /\b(should i|what should i|which should i|recommend|best (stock|bond|fund|investment)|guarantee|how much will i (earn|make))\b/i;
+
+function offlineRefusal(text: string): string | null {
+  if (CHAT_CREDENTIAL.test(text)) {
+    return "Please don't share passwords, OTPs, PINs, or card or account numbers with me or anyone. FlexBank never asks for them. I can still explain banking in general.";
+  }
+  if (CHAT_TRANSACTION.test(text)) {
+    return "I can't make, confirm, or cancel any transfer — only you can do that in the app, on the review screen. I can explain how it works, though.";
+  }
+  if (CHAT_ADVICE.test(text)) {
+    return "I can't tell you what to buy or sell or promise returns. I can explain how products like fixed deposits or bonds work in general — their value can change, and this is general information, not advice.";
+  }
+  return null;
+}
+
+/** Deterministic offline topic answers (short, beginner-friendly). */
+const OFFLINE_TOPICS: Array<{ match: RegExp; answer: string }> = [
+  {
+    match: /\bfixed deposit|time deposit|\bfd\b/i,
+    answer:
+      'A fixed deposit lets you lock a sum of money away for a set period (the tenure). In return you earn a fixed interest rate. You get your money plus interest back at the end (maturity). Taking it out early usually means less or no interest.',
+  },
+  {
+    match: /\bbond|coupon|maturity\b/i,
+    answer:
+      'A bond is like lending money to a government or company. They pay you regular interest (the coupon) and return the original amount at the end (maturity). Bond values can go up or down if you sell early. This is general information, not advice.',
+  },
+  {
+    match: /\binterest rate|\bp\.?a\.?\b|per annum|apy|aer\b/i,
+    answer:
+      'An interest rate is the percentage you earn (or pay) over a year. "Per annum" (p.a.) means "per year". For example, 3% p.a. on S$1,000 is about S$30 of interest over a year.',
+  },
+  {
+    match: /\bpaynow|transfer|send money\b/i,
+    answer:
+      'PayNow lets you send money using a recipient you choose or a registered mobile number. In FlexBank you pick the recipient, enter the amount, review the details, then confirm. Nothing is sent until you confirm it yourself.',
+  },
+  {
+    match: /\bbudget|spending|save money|savings\b/i,
+    answer:
+      'A simple way to manage money: track what you spend by category, set a monthly limit, and move a fixed amount to savings first. An emergency fund of about 3–6 months of expenses is a common goal.',
+  },
+];
+
+function offlineChatAnswer(question: string): string {
+  const refusal = offlineRefusal(question);
+  if (refusal) return refusal;
+
+  const hit = OFFLINE_TOPICS.find((t) => t.match.test(question));
+  if (hit) return hit.answer;
+
+  return "I can explain banking topics like savings, fixed deposits, bonds, interest rates, PayNow and budgeting in simple terms. Try asking about one of those. For anything account-specific, use in-app help or request human assistance.";
+}
+
+/**
+ * Ask the Concierge a free-form banking question with optional prior turns.
+ * Returns `{ text, usedFallback }`. `usedFallback` is true when the offline
+ * responder produced the answer (no AI used).
+ */
+export async function chat(
+  question: string,
+  history: ChatMessage[] = [],
+  options: { language?: Language; guidanceLevel?: ConciergeGuidance } = {},
+): Promise<ConciergeResponse> {
+  const trimmed = question.trim();
+  if (!trimmed) {
+    return fallback('Ask a banking question and I will explain it in simple terms.');
+  }
+
+  // Offline safety guard runs regardless of whether live AI is configured.
+  const refusal = offlineRefusal(trimmed);
+  if (refusal) {
+    return fallback(refusal);
+  }
+
+  const turns: ChatTurn[] = history
+    .filter((m) => (m.role === 'user' || m.role === 'model') && m.text.trim().length > 0)
+    .map((m) => ({ role: m.role, text: m.text }));
+
+  const aiText = await tryAiChat({
+    question: trimmed,
+    history: turns,
+    language: options.language,
+    guidanceLevel: options.guidanceLevel,
+  });
+
+  if (aiText) {
+    return aiOk(aiText);
+  }
+
+  return fallback(offlineChatAnswer(trimmed));
+}

@@ -204,3 +204,34 @@ Three synthetic users are seeded into the local store on first boot (see
 
 Reset the local store between demo runs with `resetDemoData()` (from
 `@/services`). In a real backend, seed these server-side instead.
+
+---
+
+## 8. Concierge AI proxy (Google Gemini, optional)
+
+The AI Concierge can run live via Google Gemini through a **separate** Express +
+TypeScript server in [`server/`](./server/README.md). It is independent of the
+auth/persistence backend above and independent of the Expo build.
+
+**Why a proxy:** the Gemini API key must never ship in the app. The proxy holds
+`GEMINI_API_KEY` server-side; the app only knows a URL
+(`EXPO_PUBLIC_CONCIERGE_AI_URL`) and receives text back.
+
+```
+Expo app ──POST /concierge(/chat)──▶ Express proxy (server/) ──▶ Gemini (free tier)
+  aiProvider.ts / concierge.ts        holds GEMINI_API_KEY        gemini-2.5-flash-lite
+        │                                    │
+        └── on 503/offline ◀─────────────────┴── no key / 429 / error → 503
+            deterministic offline fallback (always available)
+```
+
+- Endpoints: `POST /concierge` (explain/simplify/translate), `POST
+  /concierge/chat` (multi-turn), `GET /health`.
+- Free tier only; no billing. Default model `gemini-2.5-flash-lite`.
+- Offline-by-default: with no key, or no server, the app keeps working using the
+  deterministic Concierge responses. The core demo needs no AI and no network.
+- Safety: the proxy injects a banking-education system prompt and refuses to act
+  on money, ask for credentials, or give personalised investment advice; a
+  client-side guard mirrors this so offline mode is safe too.
+
+Full setup, env vars, and run instructions: **[`server/README.md`](./server/README.md)**.

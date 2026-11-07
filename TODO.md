@@ -77,21 +77,29 @@
 
 **Goal:** Introduce real AI-powered assistance while preserving offline functionality.
 
-- [ ] Integrate a real AI provider through the existing Concierge interface.
-- [ ] Support contextual banking explanations.
-- [ ] Simplify complicated financial terminology.
-- [ ] Provide plain-language explanations of savings, fixed deposits and bonds.
-- [ ] Support translation based on the customer's selected language.
-- [ ] Ensure AI responses are relevant to the current banking screen.
-- [ ] Implement appropriate error handling when the AI service is unavailable.
-- [ ] Retain deterministic offline fallback responses.
-- [ ] Store AI credentials securely on the backend rather than inside the mobile application.
-- [ ] Ensure AI cannot initiate, approve or confirm financial transactions.
+- [x] Integrate a real AI provider (Google Gemini, free tier) through a
+      server-side proxy behind the existing Concierge interface.
+- [x] Add a multi-turn chat Concierge for banking education (follow-up questions).
+- [x] Support contextual banking explanations (explain/simplify/translate retained).
+- [x] Simplify complicated financial terminology.
+- [x] Provide plain-language explanations of savings, fixed deposits and bonds.
+- [x] Support translation based on the customer's selected language (EN/ZH).
+- [x] Shape answers by the customer's guidance level.
+- [x] Implement error handling when the AI service is unavailable (429/quota/errors → 503 → fallback).
+- [x] Retain deterministic offline fallback responses.
+- [x] Store AI credentials securely on the backend (`server/.env`), never in the app.
+- [x] Ensure AI cannot initiate, approve or confirm financial transactions (prompt + server + client guards).
+- [ ] Obtain a free Gemini API key and run the proxy for the live demo (optional;
+      offline fallback works without it).
+- [ ] Optionally deploy the proxy so the demo device can reach it over the network.
 
 **Current status:**
-- The Concierge currently uses deterministic offline fallback responses.
-- No external AI provider is connected.
-- No AI API credentials are configured.
+- Live AI is implemented via the Express + TypeScript proxy in `server/`
+  (Google Gemini free tier, `gemini-2.5-flash-lite`). See `server/README.md`.
+- The app stays **offline-by-default**: with no key or no server reachable, the
+  Concierge uses deterministic responses. The core demo needs no AI.
+- The Gemini key lives only in `server/.env`; it is never shipped in the app.
+- Covered by tests (`tests/concierge-chat.test.cjs`, `tests/concierge-proxy.test.cjs`).
 
 ## 5. Additional Banking Features
 
