@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Platform,
   TextInput,
   View,
   type TextInputProps,
@@ -50,6 +51,9 @@ export function AppInput({
     flex: 1,
     paddingVertical: theme.spacing.sm,
     minHeight: 48,
+    // Web only: remove the browser's default focus outline so it doesn't show
+    // a second (yellow) ring inside our themed border. Ignored on native.
+    ...(Platform.OS === 'web' ? { outlineWidth: 0 } : null),
   };
 
   const fieldWrap: ViewStyle = {

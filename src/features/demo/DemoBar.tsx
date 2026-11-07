@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components';
 import { DEMO_PERSONAS } from '@/data';
@@ -10,15 +11,22 @@ import { personalisation } from '@/features/onboarding/personalisation';
 /**
  * Demo Mode control — DEVELOPMENT / DEMO ONLY.
  *
- * A small floating bar to switch the prototype between synthetic personas
+ * A small floating control to switch the prototype between synthetic personas
  * during a demo. It only renders in development (`__DEV__`). These personas are
  * explicit preference bundles, NOT inferred customer categories.
  *
- * Switching a persona dispatches SET_PREFERENCES + rebuilds the home layout, so
- * the whole app (theme, homepage order, guidance) adapts instantly.
+ * Positioning: the collapsed control is a compact pill pinned to the RIGHT
+ * edge, raised well ABOVE the bottom so it never overlaps a screen's primary
+ * footer button (e.g. Continue / Confirm). The persona list opens UPWARDS from
+ * the button for the same reason.
  */
+
+// Clearance above the bottom so the control clears a typical footer button.
+const FOOTER_CLEARANCE = 96;
+
 export function DemoBar() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const prefs = usePreferences();
   const [open, setOpen] = useState(false);
@@ -41,9 +49,10 @@ export function DemoBar() {
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        left: theme.spacing.md,
         right: theme.spacing.md,
-        bottom: theme.spacing.md,
+        left: theme.spacing.md,
+        // Raise above the footer area + respect the bottom safe area.
+        bottom: insets.bottom + FOOTER_CLEARANCE,
         alignItems: 'flex-end',
         gap: theme.spacing.sm,
       }}
@@ -91,13 +100,14 @@ export function DemoBar() {
         onPress={() => setOpen((o) => !o)}
         style={{
           backgroundColor: theme.colors.accent,
-          paddingVertical: theme.spacing.sm,
-          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.xs,
+          paddingHorizontal: theme.spacing.sm,
           borderRadius: theme.radius.pill,
+          opacity: 0.92,
           ...theme.shadows.md,
         }}
       >
-        <AppText role="label" style={{ color: theme.colors.onAccent }}>
+        <AppText role="caption" style={{ color: theme.colors.onAccent }}>
           Demo · {prefs.displayMode}
         </AppText>
       </Pressable>
