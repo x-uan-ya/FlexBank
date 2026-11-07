@@ -21,7 +21,8 @@ type ColorToken =
   | 'accent'
   | 'success'
   | 'warning'
-  | 'danger';
+  | 'danger'
+  | 'guidance';
 
 interface AppTextProps extends Omit<TextProps, 'role'> {
   /** Typography role from the theme (not the ARIA role). */

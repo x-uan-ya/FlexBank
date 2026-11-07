@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   Platform,
   TextInput,
@@ -40,6 +40,7 @@ export function AppInput({
 }: AppInputProps) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
+  const helperId = useId();
 
   const borderColor = error
     ? theme.colors.danger
@@ -77,6 +78,9 @@ export function AppInput({
       <View style={fieldWrap}>
         <TextInput
           accessibilityLabel={label}
+          accessibilityHint={error ?? hint}
+          aria-invalid={!!error}
+          aria-describedby={error || hint ? helperId : undefined}
           placeholderTextColor={theme.colors.textMuted}
           style={[
             inputStyle,
@@ -97,11 +101,11 @@ export function AppInput({
       </View>
 
       {error ? (
-        <AppText role="caption" color="danger" accessibilityLiveRegion="polite">
+        <AppText nativeID={helperId} role="caption" color="danger" accessibilityRole="alert" accessibilityLiveRegion="polite">
           {error}
         </AppText>
       ) : hint ? (
-        <AppText role="caption" color="textMuted">
+        <AppText nativeID={helperId} role="caption" color="textSecondary">
           {hint}
         </AppText>
       ) : null}

@@ -36,8 +36,8 @@ export function Header({ title, subtitle, onBack, right }: HeaderProps) {
           onPress={onBack}
           hitSlop={12}
           style={{
-            width: 40,
-            height: 40,
+            width: 48,
+            height: 48,
             borderRadius: theme.radius.pill,
             alignItems: 'center',
             justifyContent: 'center',

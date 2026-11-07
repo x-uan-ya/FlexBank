@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppText } from '@/components';
+import { AppText, Icon } from '@/components';
 import { DEMO_PERSONAS } from '@/data';
 import { useAppDispatch, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
@@ -11,25 +11,20 @@ import { personalisation } from '@/features/onboarding/personalisation';
 /**
  * Demo Mode control — DEVELOPMENT / DEMO ONLY.
  *
- * A small floating control to switch the prototype between synthetic personas
+ * A collapsible panel in normal layout flow to switch synthetic personas
  * during a demo. It only renders in development (`__DEV__`). These personas are
  * explicit preference bundles, NOT inferred customer categories.
  *
- * Positioning: the collapsed control is a compact pill pinned to the RIGHT
- * edge, raised well ABOVE the bottom so it never overlaps a screen's primary
- * footer button (e.g. Continue / Confirm). The persona list opens UPWARDS from
- * the button for the same reason.
+ * Switching a persona dispatches SET_PREFERENCES + rebuilds the home layout, so
+ * the whole app (theme, homepage order, guidance) adapts instantly.
  */
-
-// Clearance above the bottom so the control clears a typical footer button.
-const FOOTER_CLEARANCE = 96;
-
 export function DemoBar() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const prefs = usePreferences();
   const [open, setOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   if (!__DEV__) return null;
 
@@ -46,71 +41,76 @@ export function DemoBar() {
 
   return (
     <View
-      pointerEvents="box-none"
       style={{
-        position: 'absolute',
-        right: theme.spacing.md,
-        left: theme.spacing.md,
-        // Raise above the footer area + respect the bottom safe area.
-        bottom: insets.bottom + FOOTER_CLEARANCE,
-        alignItems: 'flex-end',
-        gap: theme.spacing.sm,
+        flexShrink: 0,
+        borderTopWidth: theme.clarity ? 2 : 1,
+        borderColor: theme.colors.borderStrong,
+        backgroundColor: theme.colors.surfaceMuted,
+        paddingBottom: insets.bottom,
       }}
     >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Close development tools' : 'Open development tools'}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        style={({ pressed }) => ({
+          minHeight: 48,
+          paddingLeft: theme.spacing.md + (Platform.OS === 'web' ? 40 : 0),
+          paddingRight: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+          backgroundColor: pressed ? theme.colors.selectedBg : undefined,
+        })}
+      >
+        <AppText role="label" style={{ flex: 1 }}>Development tools</AppText>
+        <View accessible={false}>
+          <Icon name={open ? 'back' : 'chevron'} color={theme.colors.textSecondary} />
+        </View>
+      </Pressable>
       {open ? (
-        <View
+        <ScrollView
           style={{
-            alignSelf: 'stretch',
-            backgroundColor: theme.colors.primaryStrong,
-            borderRadius: theme.radius.lg,
-            padding: theme.spacing.sm,
+            maxHeight: Math.min(240, height * 0.3),
+          }}
+          contentContainerStyle={{
+            padding: theme.spacing.md,
+            paddingBottom: theme.spacing.md + (Platform.OS === 'web' ? 48 : 0),
             gap: theme.spacing.xs,
-            ...theme.shadows.lg,
           }}
         >
-          <AppText role="caption" style={{ color: theme.colors.textInverse }}>
-            Demo personas (dev only)
+          <AppText role="caption" color="textSecondary">
+            Demo presets replace guidance, display preferences and the home layout.
+            Current display: {prefs.displayMode}.
           </AppText>
           {DEMO_PERSONAS.map((persona) => (
             <Pressable
               key={persona.id}
               accessibilityRole="button"
+              accessibilityLabel={`Apply demo preset: ${persona.label}`}
               onPress={() => applyPersona(persona.id)}
-              style={{
-                paddingVertical: theme.spacing.xs,
+              style={({ pressed }) => ({
+                minHeight: 48,
+                paddingVertical: theme.spacing.sm,
                 paddingHorizontal: theme.spacing.sm,
                 borderRadius: theme.radius.md,
-                backgroundColor: theme.colors.primary,
-              }}
+                backgroundColor: pressed ? theme.colors.selectedBg : theme.colors.surface,
+                borderWidth: theme.clarity ? 2 : 1,
+                borderColor: theme.colors.borderStrong,
+              })}
             >
-              <AppText role="label" style={{ color: theme.colors.textInverse }}>
+              <AppText role="label">
                 {persona.label}
               </AppText>
-              <AppText role="caption" style={{ color: theme.colors.accentSoft }}>
+              <AppText role="caption" color="textSecondary">
                 {persona.description}
               </AppText>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Toggle demo persona switcher"
-        onPress={() => setOpen((o) => !o)}
-        style={{
-          backgroundColor: theme.colors.accent,
-          paddingVertical: theme.spacing.xs,
-          paddingHorizontal: theme.spacing.sm,
-          borderRadius: theme.radius.pill,
-          opacity: 0.92,
-          ...theme.shadows.md,
-        }}
-      >
-        <AppText role="caption" style={{ color: theme.colors.onAccent }}>
-          Demo · {prefs.displayMode}
-        </AppText>
-      </Pressable>
     </View>
   );
 }

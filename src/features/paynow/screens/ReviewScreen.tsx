@@ -1,183 +1,123 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import {
-  AppButton,
-  AppCard,
-  AppText,
-  Header,
-  ScreenContainer,
-} from '@/components';
+import { AppButton, AppCard, AppText } from '@/components';
+import { BankingDemoNotice, BankingScreen } from '@/components/BankingScreen';
+import { GuidancePanel, PAYNOW_REVIEW_CONTENT, TransactionProgress } from '@/features/adaptive';
+import { BankingPreferencesPanel } from '@/features/adaptive/BankingPreferencesPanel';
+import { usePreferences } from '@/state';
 import { useTheme } from '@/theme';
-import { formatMoney } from '@/utils';
 
-import { ConciergeHelpPanel } from '@/features/concierge/components/ConciergeHelpPanel';
-
-import { simulateOutcome } from '../outcome';
+import { TransferSummary } from '../components/TransferSummary';
 import { usePayNow } from '../usePayNow';
-import { validateTransaction } from '../validation';
+import { canConfirmTransaction, canShowSuccessfulReceipt, validateRecipient, validateTransaction } from '../validation';
 
-/**
- * Review before confirmation (Developer B + safety-critical).
- *
- * SAFETY PRINCIPLES enforced on this screen:
- * - Details are fully reviewable here (principle 5).
- * - Confirmation is an EXPLICIT customer press (principles 1 & 2). AI never
- *   confirms.
- * - If details changed after review, the draft is `reviewRequired` and we show
- *   a notice + block confirm until re-reviewed (principle 6).
- * - Confirm is only enabled for a valid, review-ready draft, and we only go to
- *   the success page when we actually asked to confirm one.
- */
+/** Presentation update; confirmation/re-review/cancel and observed-outcome handlers remain unchanged. */
 export function ReviewScreen() {
   const theme = useTheme();
   const router = useRouter();
   const paynow = usePayNow();
+  const preferences = usePreferences();
+  const content = PAYNOW_REVIEW_CONTENT[preferences.guidanceLevel];
   const { draft } = paynow;
-  const [showHelp, setShowHelp] = useState(false);
+  const [submissionRequested, setSubmissionRequested] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | undefined>();
+  const outcomeNavigationStarted = useRef(false);
 
-  const needsReReview = draft.requiresReview || draft.status === 'reviewRequired';
+  const validation = validateTransaction(draft);
+  const needsReReview = draft.requiresReview || draft.status === 'reviewRequired' || draft.status === 'failed';
+  const canConfirm = canConfirmTransaction(draft);
+  const terminal = draft.status === 'confirmed' || draft.status === 'cancelled';
 
-  // Only a valid draft that has reached "ready for review" may be confirmed.
-  // (Covers opening this page directly, or a draft that is not complete.)
-  const canConfirm =
-    draft.status === 'readyForReview' &&
-    !draft.requiresReview &&
-    validateTransaction(draft).valid;
+  useEffect(() => {
+    if (!submissionRequested || outcomeNavigationStarted.current) return;
+    const acceptedSuccess = canShowSuccessfulReceipt(draft);
+    const acceptedFailure = draft.status === 'failed' && validateTransaction(draft).valid;
+    if (acceptedSuccess || acceptedFailure) {
+      outcomeNavigationStarted.current = true;
+      router.replace('/paynow/success');
+    } else if (!canConfirmTransaction(draft)) {
+      setSubmissionRequested(false);
+      setSubmissionError('The transfer was not submitted. Check the details and review again.');
+    }
+  }, [draft, router, submissionRequested]);
 
   function confirm() {
-    if (!canConfirm) {
-      return; // Never show "success" for a transfer that was not confirmable.
-    }
+    if (!canConfirm || submissionRequested) return;
+    setSubmissionError(undefined);
+    setSubmissionRequested(true);
+    // The reducer validates and records the outcome. The effect above only
+    // navigates once that authoritative outcome is visible in shared state.
+    paynow.confirmTransaction();
+  }
 
-    // The customer has pressed Confirm. Now run the SIMULATED bank outcome.
-    const outcome = simulateOutcome(draft);
-    if (!outcome.ok) {
-      paynow.failTransfer(outcome.reason);
-    } else {
-      // Explicit customer action. Reducer verifies the draft is review-ready.
-      paynow.confirmTransaction();
-    }
-    router.replace('/paynow/success');
+  function reviewAgain() {
+    if (!validation.valid || terminal) return;
+    setSubmissionError(undefined);
+    paynow.requestReview();
+  }
+
+  function editDetails() {
+    router.replace(validateRecipient(draft).valid ? '/paynow/amount' : '/paynow/recipient');
   }
 
   function cancel() {
+    if (terminal || submissionRequested) return;
+    setSubmissionRequested(false);
     paynow.cancelTransfer();
     router.replace('/home');
   }
 
-  return (
-    <ScreenContainer
-      footer={
-        <View style={{ gap: theme.spacing.sm }}>
-          {/* TODO: SAFETY FEATURE — Dev D: insert a Confidence Checkpoint here
-              (e.g. route to /checkpoint before confirm in guided mode). */}
-          {!canConfirm && !needsReReview ? (
-            <AppText role="caption" color="textSecondary" center>
-              Go back and complete the recipient and amount to continue.
-            </AppText>
-          ) : null}
-          <AppButton
-            label="Confirm and send"
-            onPress={confirm}
-            disabled={!canConfirm}
-            accessibilityHint="Sends the transfer after you confirm"
-          />
-          <AppButton label="Cancel" variant="ghost" onPress={cancel} />
-        </View>
-      }
-    >
-      <Header
-        title="Review"
-        subtitle="Check the details before you confirm"
-        onBack={router.canGoBack() ? () => router.back() : undefined}
-      />
+  return <BankingScreen title="Review your transfer" subtitle="Check everything carefully before sending."
+    backTo={validateRecipient(draft).valid ? '/paynow/amount' : '/paynow/recipient'}>
+    <TransactionProgress currentStep={validation.valid ? 'review' : validateRecipient(draft).valid ? 'amount' : 'recipient'}
+      completionLabel="Done" wrapInPairs />
+    <BankingPreferencesPanel />
 
-      {needsReReview ? (
-        <AppCard style={{ borderColor: theme.colors.warning }}>
-          <AppText role="bodyStrong" color="warning">
-            Details changed — please review again
-          </AppText>
-          <AppText role="caption" color="textSecondary">
-            For your security, confirm is disabled until you re-check the amount
-            and recipient.
-          </AppText>
-          <View style={{ marginTop: theme.spacing.sm }}>
-            <AppButton
-              label="I have reviewed the details"
-              variant="secondary"
-              onPress={() => paynow.requestReview()}
-            />
-          </View>
-        </AppCard>
-      ) : null}
+    {!validation.valid || submissionError ? <AppCard elevation="none" style={{ borderColor: theme.colors.danger }}>
+      <View style={{ gap: theme.spacing.sm }}>
+        <AppText role="bodyStrong" color="danger" accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {submissionError ?? validation.messages.join(' ')}
+        </AppText>
+        <AppText role="caption" color="textSecondary">Use Edit details to correct the recipient and amount before confirming.</AppText>
+      </View>
+    </AppCard> : null}
 
-      <AppCard>
-        <Row label="Paying" value={draft.recipientName ?? '—'} />
-        <Divider />
-        <Row
-          label="To"
-          value={`${draft.recipientBank ?? ''} ${draft.recipientIdentifier ?? ''}`.trim() || '—'}
-        />
-        <Divider />
-        <Row
-          label="Amount"
-          value={draft.amount !== undefined ? formatMoney(draft.amount, draft.currency) : '—'}
-          emphasise
-        />
-      </AppCard>
+    <TransferSummary draft={draft} source />
 
-      {showHelp ? (
-        <ConciergeHelpPanel
-          context="paynow-review"
-          title="What should I check before confirming?"
-          onClose={() => setShowHelp(false)}
-        />
-      ) : (
-        <AppButton
-          label="Explain this screen"
-          variant="ghost"
-          onPress={() => setShowHelp(true)}
-        />
-      )}
+    {needsReReview ? <AppCard elevation="none" style={{ backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning }}>
+      <View style={{ gap: theme.spacing.sm }}>
+        <AppText role="bodyStrong">Details changed — please review again</AppText>
+        <AppText color="textSecondary">Check the updated recipient and amount. Confirm is unavailable until you acknowledge the details.</AppText>
+        <AppButton label="I have reviewed the details" variant="secondary" onPress={reviewAgain}
+          disabled={!validation.valid || terminal || submissionRequested} />
+      </View>
+    </AppCard> : null}
 
-      <AppText role="caption" color="textMuted" center>
-        No real money moves. Synthetic demo data only.
-      </AppText>
-    </ScreenContainer>
-  );
-}
+    {preferences.guidanceLevel === 'guided' ? <GuidancePanel title="Check before you confirm"
+      body="A careful check helps you avoid sending to the wrong person."
+      items={content.checklist} /> : null}
 
-function Row({
-  label,
-  value,
-  emphasise,
-}: {
-  label: string;
-  value: string;
-  emphasise?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: theme.spacing.xs,
-        gap: theme.spacing.md,
-      }}
-    >
-      <AppText role="body" color="textSecondary">
-        {label}
-      </AppText>
-      <AppText role={emphasise ? 'heading' : 'bodyStrong'}>{value}</AppText>
+    <AppCard elevation="none" style={{ backgroundColor: theme.colors.warningSoft, borderColor: theme.colors.warning }}>
+      <View style={{ gap: theme.spacing.xs }}>
+        <AppText role="bodyStrong">Confirm only when everything is correct</AppText>
+        <AppText role="caption" color="textSecondary">
+          Choosing Confirm and send submits this demo transfer. Check the recipient, destination and amount first.
+        </AppText>
+      </View>
+    </AppCard>
+    <BankingDemoNotice />
+    <View style={{ gap: theme.spacing.sm }}>
+      <AppButton label="Confirm and send" onPress={confirm} disabled={!canConfirm || submissionRequested}
+        loading={submissionRequested} accessibilityHint="Explicitly confirms the simulated transfer after all details have been reviewed" />
+      <AppButton label="Edit details" variant="secondary" onPress={editDetails} disabled={terminal || submissionRequested}
+        accessibilityHint="Returns to edit without clearing this transfer" />
+      <AppButton label="Cancel transfer" variant="ghost" onPress={cancel} disabled={terminal || submissionRequested}
+        accessibilityHint="Clears this transfer and returns to Home" />
+      {terminal ? <AppButton label="Return Home" variant="secondary" onPress={() => router.replace('/home')} /> : null}
     </View>
-  );
-}
-
-function Divider() {
-  const theme = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.colors.border }} />;
+    <AppButton label="Explain this screen" variant="ghost" onPress={() => router.push({ pathname: '/concierge', params: { returnTo: '/paynow/review' } })}
+      accessibilityHint="Opens demo Banking Concierge; it cannot confirm or change this transfer" />
+  </BankingScreen>;
 }

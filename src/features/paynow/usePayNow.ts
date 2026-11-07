@@ -53,7 +53,7 @@ export function usePayNow(): PayNowApi {
         dispatch({ type: 'MARK_READY_FOR_REVIEW' });
       },
       confirmTransaction() {
-        // Explicit customer action only.
+        // Explicit customer action only. Reducer validates and simulates outcome.
         dispatch({ type: 'CONFIRM_TRANSACTION' });
       },
       cancelTransfer() {
