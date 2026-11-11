@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -41,7 +41,7 @@ describe('SupabaseStore PostgreSQL integration', { skip: !databaseUrl }, () => {
   it('persists users, preferences, accounts and idempotent transfers', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
     const email = `postgres-${suffix}@demo.flexbank.test`;
-    const password = `Test-${suffix}`;
+    const password = randomBytes(32).toString('base64url');
     const passwordHash = await hashPassword(password);
     const initialPreferences = {
       guidanceLevel: 'guided' as const,
