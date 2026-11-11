@@ -8,7 +8,8 @@ import express, { type NextFunction, type Request, type Response } from 'express
 
 import { createApi } from './api';
 import { loadConfig } from './config';
-import { MemoryStore } from './store';
+import { MemoryStore, type Store } from './store';
+import { SupabaseStore } from './supabaseStore';
 
 try {
   process.loadEnvFile(); // reads the ".env" file if there is one
@@ -18,8 +19,32 @@ try {
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const store = new MemoryStore();
-  await store.init();
+  const storeDriver = process.env.STORE_DRIVER?.trim().toLowerCase();
+  let store: Store;
+  let closeStore: (() => Promise<void>) | undefined;
+
+  if (storeDriver === 'postgres') {
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL is required when STORE_DRIVER=postgres');
+    }
+    const postgresStore = new SupabaseStore(databaseUrl);
+    try {
+      await postgresStore.init();
+    } catch (err) {
+      await postgresStore.close();
+      throw err;
+    }
+    store = postgresStore;
+    closeStore = () => postgresStore.close();
+    console.log('Data store: PostgreSQL');
+  } else {
+    const memoryStore = new MemoryStore();
+    await memoryStore.init();
+    store = memoryStore;
+    console.log('Data store: in-memory demo');
+  }
+
   const api = createApi({ store, config });
 
   const app = express();
@@ -60,7 +85,7 @@ async function main(): Promise<void> {
     res.status(400).json({ error: { message: 'We could not read that request.' } });
   });
 
-  app.listen(config.port, '0.0.0.0', () => {
+  const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`FlexBank server running on http://localhost:${config.port}`);
     console.log('Demo logins use the password in README.md (synthetic data only).');
     console.log(`Demo controls: ${config.demoKey ? 'ON' : 'OFF'}`);
@@ -68,6 +93,25 @@ async function main(): Promise<void> {
       console.warn(`WARNING: ${warning}`);
     }
   });
+
+  const shutdown = (signal: NodeJS.Signals): void => {
+    console.log(`Received ${signal}; shutting down.`);
+    server.close(() => {
+      if (!closeStore) {
+        process.exit(0);
+        return;
+      }
+      void closeStore().then(
+        () => process.exit(0),
+        (err: unknown) => {
+          console.error('Could not close the PostgreSQL pool:', err instanceof Error ? err.message : err);
+          process.exit(1);
+        },
+      );
+    });
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
 
 main().catch((err: unknown) => {

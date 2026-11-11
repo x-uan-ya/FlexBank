@@ -25,6 +25,11 @@ Open `http://localhost:4000/api/health`. You should see `{"ok":true}`.
 
 Edit `.env` before the real demo (see the comments inside). **Never commit `.env`.**
 
+The default `STORE_DRIVER=memory` keeps the reset-on-restart demo behavior. To
+use the migrated Supabase PostgreSQL database, set `STORE_DRIVER=postgres` and
+`DATABASE_URL` in the server-only `.env`. The Expo app still talks only to this
+Express API and never receives the database URL.
+
 ## Demo logins
 
 Password for all three: `Demo1234!` (demo only)
@@ -92,9 +97,14 @@ npm test
 npm run typecheck
 ```
 
+When `DATABASE_URL` is present, `npm test` also runs the PostgreSQL persistence
+suite. It creates a uniquely named synthetic user and removes it afterward.
+
 ## Where teammates plug in
 
-- **Database (Supabase):** write a `SupabaseStore` in `src/store.ts` that answers the same questions as `MemoryStore` (the `Store` list at the top of that file), then use it in `src/index.ts` instead of `MemoryStore`. The routes do not change.
+- **Database (Supabase):** `src/supabaseStore.ts` implements the same `Store`
+  contract as `MemoryStore`. `src/index.ts` selects it when
+  `STORE_DRIVER=postgres`; the routes do not change.
 - **AI Concierge:** add routes to the `routes` list in `src/api.ts` (one `authed('POST', '/api/...', ...)` line each). Keep the AI key in `.env` only, and keep it on this server, never in the app. The AI must never be able to start or confirm a transfer.
 - **Languages:** the server stores each customer's chosen language (`en`, `zh`, `ms`, `ta`). Translations of screen text and explanations belong with the AI and frontend work.
 - **Frontend:** call the API in the table above.
