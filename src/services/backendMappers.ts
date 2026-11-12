@@ -16,8 +16,7 @@ const PRIORITY_FROM_BACKEND: Record<BackendPriority, Priority> = {
   accountOverview: 'moneyManagement',
 };
 
-// STOPGAP: the backend has no bankingPurposes yet, so we translate the
-// customer's explicit backend choices. Remove once the backend stores purposes.
+// Used only when the backend has no bankingPurposes for a customer.
 const PURPOSE_FROM_BACKEND: Record<BackendPriority, BankingPurpose> = {
   transfers: 'everyday',
   billPayments: 'everyday',
@@ -28,7 +27,7 @@ function unique<T>(items: T[]): T[] {
   return items.filter((item, index) => items.indexOf(item) === index);
 }
 
-/** Turn the backend's preferences into the app's full preferences. */
+/** Backend preferences -> the app's full preferences. */
 export function preferencesFromBackend(prefs: BackendPreferences): CustomerPreferences {
   const mapped = unique(prefs.priorities.map((p) => PRIORITY_FROM_BACKEND[p]));
   // Keep every app priority present so nothing becomes unreachable.
@@ -36,7 +35,14 @@ export function preferencesFromBackend(prefs: BackendPreferences): CustomerPrefe
     ...mapped,
     ...DEFAULT_PREFERENCES.priorities.filter((p) => !mapped.includes(p)),
   ];
-  const purposes = unique(prefs.priorities.map((p) => PURPOSE_FROM_BACKEND[p]));
+
+  const fallbackPurposes = unique(prefs.priorities.map((p) => PURPOSE_FROM_BACKEND[p]));
+  const bankingPurposes =
+    prefs.bankingPurposes && prefs.bankingPurposes.length > 0
+      ? prefs.bankingPurposes
+      : fallbackPurposes.length > 0
+        ? fallbackPurposes
+        : DEFAULT_PREFERENCES.bankingPurposes;
 
   return {
     ...DEFAULT_PREFERENCES,
@@ -44,8 +50,26 @@ export function preferencesFromBackend(prefs: BackendPreferences): CustomerPrefe
     guidanceLevel: prefs.guidanceLevel,
     displayMode: prefs.displayMode,
     priorities,
-    bankingPurposes:
-      purposes.length > 0 ? purposes : DEFAULT_PREFERENCES.bankingPurposes,
+    bankingPurposes,
+  };
+}
+
+/** The app's preferences -> what the backend accepts. */
+export function preferencesToBackend(prefs: CustomerPreferences): BackendPreferences {
+  const priorities: BackendPreferences['priorities'] = [];
+  if (prefs.priorities.includes('payments') || prefs.bankingPurposes.includes('everyday')) {
+    priorities.push('transfers', 'billPayments');
+  }
+  if (prefs.priorities.includes('moneyManagement') || prefs.bankingPurposes.includes('managing')) {
+    priorities.push('accountOverview');
+  }
+  return {
+    language: prefs.language,
+    guidanceLevel: prefs.guidanceLevel,
+    displayMode: prefs.displayMode,
+    // The backend accepts 1 to 3 values.
+    priorities: priorities.length > 0 ? unique(priorities).slice(0, 3) : ['transfers'],
+    bankingPurposes: prefs.bankingPurposes,
   };
 }
 
@@ -58,7 +82,7 @@ export function profileFromBackend(user: LoginResponse['user']): UserProfile {
   };
 }
 
-/** Turn a backend login response into the shape the app already uses. */
+/** A backend login response -> the shape the app already uses. */
 export function authResultFromBackend(res: LoginResponse): AuthResult {
   return {
     token: res.token,
