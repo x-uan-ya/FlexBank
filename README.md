@@ -1,5 +1,8 @@
 # FlexBank
 
+> Setting up Supabase? Start with the runnable migration and setup guide in
+> [`docs/database-schema.md`](docs/database-schema.md).
+
 **Adaptive Banking: One Experience for Every Customer** — a competition-grade
 mobile banking prototype foundation (OCBC Innovation Challenge, Problem 4).
 

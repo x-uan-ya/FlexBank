@@ -45,72 +45,28 @@ LocalAuthService  ──────────────┐
 - **Frontend:** React Native + Expo (unchanged).
 - **Backend:** Node.js + Express + TypeScript.
 - **Database:** Supabase PostgreSQL.
-- **Auth:** Supabase Auth (email/password), with Row Level Security (RLS).
+- **Auth:** the existing Express scrypt password verification and HS256 JWTs in
+  `backend/src/auth.ts`. Supabase Auth is not used yet.
 
-The Express layer is the broker that holds the **service-role key** and talks to
-Supabase. The app only ever receives the **anon/public key** and a user access
-token. Never ship the service-role key or DB password in the Expo app.
+The Express layer holds the **service-role key**, verifies its own JWTs, and
+talks to PostgreSQL. The app only receives the Express API URL and JWT. Never
+ship the service-role key, database password, or stored password hashes in the
+Expo app.
 
 ---
 
 ## 3. Database schema (Supabase / PostgreSQL)
 
-```sql
--- profiles: 1 row per user (id matches Supabase auth.users.id)
-create table profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  full_name text not null,
-  email text not null unique,
-  created_at timestamptz not null default now()
-);
+The complete, runnable schema is now maintained as a migration:
 
--- user_preferences: 1 row per user
-create table user_preferences (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles (id) on delete cascade,
-  guidance_level text not null check (guidance_level in ('quick','balanced','guided')),
-  display_mode  text not null check (display_mode in ('standard','largeText','highClarity')),
-  language      text not null check (language in ('en','zh','ms','ta')),
-  visual_theme  text not null default 'classic',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (user_id)
-);
+- `supabase/migrations/01_initial_schema.sql`
+- `supabase/seed.sql` for synthetic demo users, accounts, and recipients
+- `docs/database-schema.md` for setup, relationships, constraints, access controls, and the
+  TypeScript-to-PostgreSQL naming map
 
--- user_banking_purposes: N rows per user (the primary personalisation driver)
-create table user_banking_purposes (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles (id) on delete cascade,
-  purpose_key text not null check (purpose_key in
-    ('saving','fixedDeposits','investments','everyday','managing','learning')),
-  sort_order int not null default 0,
-  created_at timestamptz not null default now(),
-  unique (user_id, purpose_key)
-);
-
--- widget_layouts: optional per-user custom ordering/visibility
-create table widget_layouts (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles (id) on delete cascade,
-  widget_key text not null,
-  display_order int not null default 0,
-  is_visible boolean not null default true,
-  unique (user_id, widget_key)
-);
-```
-
-### Row Level Security (so users only see their own data)
-
-```sql
-alter table profiles enable row level security;
-alter table user_preferences enable row level security;
-alter table user_banking_purposes enable row level security;
-alter table widget_layouts enable row level security;
-
--- Example policy (repeat per table, matching user_id / id to auth.uid()):
-create policy "own rows" on user_preferences
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-```
+Do not copy an abbreviated schema from this architecture document. Apply the
+migration so all tables, indexes, triggers, constraints, and access grants are
+created together.
 
 ---
 
@@ -119,31 +75,19 @@ create policy "own rows" on user_preferences
 All JSON. All user routes require a bearer token; the server resolves the user
 from it and enforces per-user access (never trust a user_id from the client).
 
-```
-Auth
-  POST /api/auth/register   { fullName, email, password, preferences } -> { token, profile, preferences }
-  POST /api/auth/login      { email, password }                        -> { token, profile, preferences }
-  POST /api/auth/logout     -> { ok: true }
-
-Customer
-  GET  /api/users/me          -> { profile }
-  GET  /api/users/preferences -> { preferences }
-  PUT  /api/users/preferences { preferences } -> { preferences }
-
-Banking purposes
-  GET  /api/banking-purposes            -> { purposes: string[] }
-  POST /api/banking-purposes { purposes } -> { purposes }
-  PUT  /api/banking-purposes { purposes } -> { purposes }
-
-Homepage
-  GET  /api/home/personalised -> { sections, explanations }   // may be computed client-side instead
-  PUT  /api/home/layout { layout } -> { layout }
-```
-
-These shapes already match what the app consumes (`AuthResult`,
-`CustomerPreferences`, `BankingPurpose[]`). The purpose engine
-(`src/features/home/purposeEngine.ts`) can stay client-side, or move behind
-`GET /api/home/personalised` with no UI change.
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/register` | Create a user and return an Express JWT. |
+| `POST` | `/api/auth/login` | Verify the scrypt hash and return an Express JWT. |
+| `GET` | `/api/me` | Return the authenticated user and preferences. |
+| `PUT` | `/api/me/preferences` | Replace explicit preferences. |
+| `GET` | `/api/accounts` | Return the user's synthetic account. |
+| `GET` | `/api/recipients` | List recipients without mobile lookup values. |
+| `GET` | `/api/recipients/lookup` | Look up a recipient by validated mobile number. |
+| `POST` | `/api/transfers/validate` | Validate recipient, amount, and balance. |
+| `POST` | `/api/transfers/confirm` | Atomically apply an idempotent transfer. |
+| `GET` | `/api/transactions` | Return newest-first history. |
+| `POST` | `/api/demo/reset` | Reset synthetic data when `DEMO_KEY` is enabled. |
 
 ---
 
@@ -153,13 +97,12 @@ Frontend (`.env`, read via Expo public env — safe values only):
 
 ```
 EXPO_PUBLIC_API_URL=https://your-api.example.com
-EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>   # safe to ship
 ```
 
 Backend only (server environment — NEVER in the app):
 
 ```
+JWT_SECRET=<long random value used by the existing Express auth>
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<service role key>      # secret, server only
 DATABASE_URL=postgresql://...                     # if connecting directly
@@ -169,22 +112,25 @@ DATABASE_URL=postgresql://...                     # if connecting directly
 
 ## 6. How to swap local → Supabase (no UI changes)
 
-1. Stand up the Express server + Supabase project with the schema above.
-2. Create `src/services/remoteAuthService.ts` that implements the SAME
+1. Apply the schema after running the documented `public.users` preflight.
+2. Implement `SupabaseStore` against the existing `Store` interface and use it
+   in `backend/src/index.ts` instead of `MemoryStore`. Keep Express auth and JWT
+   handling unchanged.
+3. Create `src/services/remoteAuthService.ts` that implements the SAME
    `AuthService` interface by calling your API with `fetch`:
    - `register` → `POST /api/auth/register`
    - `login` → `POST /api/auth/login`
    - `getSession` → read stored token (keep using SecureStore) then
-     `GET /api/users/me` + `GET /api/users/preferences`
-   - `updatePreferences` → `PUT /api/users/preferences`
+     `GET /api/me`
+   - `updatePreferences` → `PUT /api/me/preferences`
    - `logout` → `POST /api/auth/logout` + clear the local token
-3. In `src/services/index.ts`, export the remote implementation instead of the
+4. In `src/services/index.ts`, export the remote implementation instead of the
    local one:
    ```ts
    // export { authService } from './authService';       // local (default)
    export { authService } from './remoteAuthService';     // remote
    ```
-4. That's it — `SessionProvider`, all screens, and the purpose engine are
+5. That's it — `SessionProvider`, all screens, and the purpose engine are
    unchanged because they depend only on the interface.
 
 Keep the local implementation as an **offline fallback** for demos.

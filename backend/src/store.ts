@@ -56,7 +56,7 @@ export interface Store {
   reset(): Promise<void>;
 }
 
-const SEED_RECIPIENTS: Recipient[] = [
+export const DEMO_RECIPIENTS: readonly Recipient[] = [
   { id: 'rcp-alex', name: 'Alex Tan', bank: 'DBS', maskedIdentifier: '•••• 4821', initials: 'AT', mobile: '90004821' },
   { id: 'rcp-sarah', name: 'Sarah Lim', bank: 'OCBC', maskedIdentifier: '•••• 1293', initials: 'SL', mobile: '90001293' },
   { id: 'rcp-marcus', name: 'Marcus Lee', bank: 'UOB', maskedIdentifier: '•••• 7356', initials: 'ML', mobile: '90007356' },
@@ -65,7 +65,7 @@ const SEED_RECIPIENTS: Recipient[] = [
 ];
 
 /** Demo customers. Each one explicitly "chose" different preferences at registration. */
-const SEED_USERS: { name: string; email: string; preferences: Preferences }[] = [
+export const DEMO_USERS: ReadonlyArray<{ name: string; email: string; preferences: Preferences }> = [
   {
     name: 'Quick Navigator',
     email: 'quick@demo.flexbank.test',
@@ -105,11 +105,11 @@ export class MemoryStore implements Store {
     this.users.clear();
     this.accounts.clear();
     this.transactions = [];
-    this.recipients = SEED_RECIPIENTS.map((r) => ({ ...r }));
+    this.recipients = DEMO_RECIPIENTS.map((r) => ({ ...r }));
     this.referenceCounter = 0;
 
     const passwordHash = await hashPassword(DEMO_PASSWORD);
-    for (const seed of SEED_USERS) {
+    for (const seed of DEMO_USERS) {
       await this.createUser({ ...seed, passwordHash });
     }
   }
