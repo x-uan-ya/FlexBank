@@ -12,6 +12,9 @@ import { formatMoney } from '@/utils';
 
 import { HomeIcon } from '../components/HomeIcon';
 import { WidgetRenderer } from '../components/WidgetRenderer';
+import { PurposeWidgets } from '../components/PurposeWidgets';
+import { RecentActivity } from '../components/RecentActivity';
+import { useCurrentUser } from '@/features/shell/useCurrentUser';
 
 type HomeDetail = 'transfer' | 'accounts' | 'spending';
 
@@ -19,6 +22,7 @@ type HomeDetail = 'transfer' | 'accounts' | 'spending';
 export function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { firstName } = useCurrentUser();
   const router = useRouter();
   const { width, fontScale } = useWindowDimensions();
   const [balanceHidden, setBalanceHidden] = useState(false);
@@ -76,7 +80,7 @@ export function HomeScreen() {
           </View>
 
           <View style={{ gap: theme.spacing.xs }}>
-            <AppText role="display" accessibilityRole="header">Hello,</AppText>
+            <AppText role="display" accessibilityRole="header">{firstName ? `Hello, ${firstName}` : 'Hello,'}</AppText>
             <AppText role="subheading" color="textSecondary" style={{ fontWeight: '400' }}>Your money, at a glance.</AppText>
           </View>
 
@@ -137,6 +141,7 @@ export function HomeScreen() {
             <AppText role="caption" color="textSecondary">Scan &amp; Pay: preview only. Transfers: PayNow demo only.</AppText>
           </View>
 
+          <PurposeWidgets balanceHidden={balanceHidden} />
           <Pressable accessibilityRole="button" accessibilityLabel="Made for you. Personalise your home dashboard"
             onPress={() => router.push('/customize')} style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}>
             <AppCard style={{ borderRadius: theme.radius.xl }}>
@@ -196,6 +201,7 @@ export function HomeScreen() {
               Ask Banking Concierge
             </AppText>
           </Pressable>
+          <RecentActivity hidden={balanceHidden} />
           <AppText role="caption" color="textSecondary" center>Synthetic demo data · No real money moves.</AppText>
         </View>
       </ScrollView>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
@@ -5,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components';
 import { DemoBar } from '@/features/demo/DemoBar';
+import { BottomTabBar, useTabsVisible } from '@/features/shell/BottomTabBar';
 import { SessionProvider, usePreferences } from '@/state';
 import { ThemeProvider } from '@/theme';
 
@@ -18,6 +20,7 @@ import { ThemeProvider } from '@/theme';
  *         ThemeProvider
  *           ErrorBoundary    ← graceful failure, never a raw crash screen
  *             Stack          ← the navigator
+ *             BottomTabBar   ← only on Home, Plan, Pay, Rewards and More
  *
  * The ThemeProvider lives INSIDE SessionProvider so changing `displayMode`
  * (an explicit customer choice) re-themes the entire app automatically.
@@ -34,6 +37,8 @@ export default function RootLayout() {
 
 function ThemedApp() {
   const preferences = usePreferences();
+  const tabsVisible = useTabsVisible();
+  const [tabBarHeight, setTabBarHeight] = useState(0);
 
   return (
     <ThemeProvider mode={preferences.displayMode} visualTheme={preferences.visualTheme}>
@@ -48,8 +53,20 @@ function ThemedApp() {
               }}
             />
           </View>
-          {/* Dev-only persona switcher; renders nothing in production. */}
-          <DemoBar />
+          {tabsVisible ? <BottomTabBar onHeight={setTabBarHeight} /> : null}
+          {/* Dev-only persona switcher; sits just above the tab bar so it never covers a tab. */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: tabsVisible ? tabBarHeight : 0,
+            }}
+          >
+            <DemoBar />
+          </View>
         </View>
       </ErrorBoundary>
     </ThemeProvider>
