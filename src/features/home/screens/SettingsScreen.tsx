@@ -74,6 +74,16 @@ export function SettingsScreen() {
       </AppCard>
     </Section>
 
+    <Section title="Savings">
+      <AppCard elevation="none">
+        <View style={{ gap: theme.spacing.sm }}>
+          <AppText role="subheading">Savings Pockets</AppText>
+          <AppText color="textSecondary">Organise your savings into goals like a holiday or emergency fund, and track your progress. Simulated demo only.</AppText>
+          <AppButton label="Open Savings Pockets" variant="secondary" onPress={() => router.push('/savings')} />
+        </View>
+      </AppCard>
+    </Section>
+
     <Section title="Help">
       <AppButton label="Ask Banking Concierge" variant="secondary" onPress={() => router.push({ pathname: '/concierge', params: { returnTo: '/settings' } })} />
       <AppText role="caption" color="textSecondary">Plain-language demo explanations. Live AI and live banking support are not connected.</AppText>

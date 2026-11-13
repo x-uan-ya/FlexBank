@@ -8,5 +8,5 @@
  */
 
 export { authService, isValidEmail, type AuthService } from './authService';
-export { clearAllFlexBankData } from './storage';
+export { clearAllFlexBankData, jsonStorage } from './storage';
 export { seedDemoAccounts, resetDemoData } from './seedDemo';
