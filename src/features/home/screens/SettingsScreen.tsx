@@ -74,12 +74,19 @@ export function SettingsScreen() {
       </AppCard>
     </Section>
 
-    <Section title="Savings">
+    <Section title="Savings & investments">
       <AppCard elevation="none">
         <View style={{ gap: theme.spacing.sm }}>
           <AppText role="subheading">Savings Pockets</AppText>
           <AppText color="textSecondary">Organise your savings into goals like a holiday or emergency fund, and track your progress. Simulated demo only.</AppText>
           <AppButton label="Open Savings Pockets" variant="secondary" onPress={() => router.push('/savings')} />
+        </View>
+      </AppCard>
+      <AppCard elevation="none">
+        <View style={{ gap: theme.spacing.sm }}>
+          <AppText role="subheading">Investment Tracker</AppText>
+          <AppText color="textSecondary">Monitor simulated fixed deposits and bonds, upcoming maturities and coupon dates. Estimates only, not advice.</AppText>
+          <AppButton label="Open Investment Tracker" variant="secondary" onPress={() => router.push('/investments')} />
         </View>
       </AppCard>
     </Section>
