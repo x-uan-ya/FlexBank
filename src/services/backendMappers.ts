@@ -1,4 +1,5 @@
 import type { AuthResult, UserProfile } from '@/types/auth';
+import { BACKEND_STORES_PURPOSES } from '@/config/api';
 import {
   DEFAULT_PREFERENCES,
   type BankingPurpose,
@@ -69,7 +70,7 @@ export function preferencesToBackend(prefs: CustomerPreferences): BackendPrefere
     displayMode: prefs.displayMode,
     // The backend accepts 1 to 3 values.
     priorities: priorities.length > 0 ? unique(priorities).slice(0, 3) : ['transfers'],
-    bankingPurposes: prefs.bankingPurposes,
+    ...(BACKEND_STORES_PURPOSES ? { bankingPurposes: prefs.bankingPurposes } : {}),
   };
 }
 

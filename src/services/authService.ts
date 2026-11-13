@@ -32,6 +32,7 @@ import {
   verifyPassword,
 } from './crypto';
 import { jsonStorage, secureStorage } from './storage';
+import { createBackendAuthService } from './backendAuth';
 
 /* --------------------------- Storage key map --------------------------- */
 // Directory of registered emails -> userId (non-secret).
@@ -176,5 +177,8 @@ class LocalAuthService implements AuthService {
   }
 }
 
-/** The single app-wide auth service instance. */
-export const authService: AuthService = new LocalAuthService();
+/** The on-device implementation. Used offline and for older local accounts. */
+const localAuthService: AuthService = new LocalAuthService();
+
+/** The single app-wide auth service: backend first, on-device as the fallback. */
+export const authService: AuthService = createBackendAuthService(localAuthService);
