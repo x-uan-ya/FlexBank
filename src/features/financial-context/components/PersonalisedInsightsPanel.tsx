@@ -177,7 +177,10 @@ function InsightCard({
   const theme = useTheme();
   const action = safeInsightAction(insight);
   return (
-    <AppCard accessibilityLabel={`${insight.title}. ${insight.explanation}`}>
+    <AppCard
+      accessibilityLabel={`${insight.title}. ${insight.explanation}`}
+      style={theme.clarity ? { borderWidth: 1, borderColor: theme.colors.border } : undefined}
+    >
       <View style={{ gap: theme.spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
           <Icon name={iconFor(insight.type)} circle size={20} />

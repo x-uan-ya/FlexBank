@@ -24,6 +24,8 @@ interface AppInputProps extends TextInputProps {
   /** Customer-friendly error message (never raw errors). */
   error?: string;
   hint?: string;
+  /** Optional semantic focus border for a feature-specific form treatment. */
+  focusBorderColor?: string;
   /** Optional element rendered inside the field, right-aligned (e.g. show/hide). */
   rightAccessory?: React.ReactNode;
 }
@@ -32,6 +34,7 @@ export function AppInput({
   label,
   error,
   hint,
+  focusBorderColor,
   rightAccessory,
   style,
   onFocus,
@@ -45,7 +48,7 @@ export function AppInput({
   const borderColor = error
     ? theme.colors.danger
     : focused
-      ? theme.colors.focusRing
+      ? focusBorderColor ?? theme.colors.focusRing
       : theme.colors.border;
 
   const inputStyle: TextStyle = {
@@ -54,7 +57,7 @@ export function AppInput({
     minHeight: 48,
     // Web only: remove the browser's default focus outline so it doesn't show
     // a second (yellow) ring inside our themed border. Ignored on native.
-    ...(Platform.OS === 'web' ? { outlineWidth: 0 } : null),
+    ...(Platform.OS === 'web' ? { outlineColor: 'transparent', outlineStyle: 'solid', outlineWidth: 0 } : null),
   };
 
   const fieldWrap: ViewStyle = {

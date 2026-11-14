@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton, AppCard, AppText, SelectableCard, ThemePreview } from '@/components';
 import { BankingScreen } from '@/components/BankingScreen';
 import { AdaptiveModeSwitcher, ReadabilityModeSwitcher, recommendHomeExperience } from '@/features/adaptive';
-import { useAppDispatch, useHomeLayout, usePreferences } from '@/state';
+import { useAppDispatch, useAuth, useHomeLayout, usePreferences } from '@/state';
 import { useTheme } from '@/theme';
 import { DEFAULT_HOME_LAYOUT } from '@/types/home';
 import { bankingReturnRoute } from '@/utils/bankingNavigation';
@@ -29,11 +29,14 @@ export function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { logout } = useAuth();
   const prefs = usePreferences();
   const layout = useHomeLayout();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [moreOpen, setMoreOpen] = useState(false);
   const [status, setStatus] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const recommendation = recommendHomeExperience({ preferences: prefs, existingLayout: layout,
     approvedWidgetIds: DEFAULT_HOME_LAYOUT.map(widget => widget.id) });
 
@@ -51,6 +54,19 @@ export function SettingsScreen() {
     const priorities = selected ? prefs.priorities.filter(item => item !== priority) : [...prefs.priorities, priority];
     dispatch({ type: 'SET_PREFERENCES', payload: { priorities } });
     announce('Priorities saved. Your homepage layout stays as it is until you apply an arrangement in Made for You.');
+  }
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLogoutError('');
+    setLoggingOut(true);
+    try {
+      await logout();
+      router.replace('/login');
+    } catch {
+      setLogoutError('We could not log you out. Please try again.');
+      setLoggingOut(false);
+    }
   }
 
   return <BankingScreen title="Settings" subtitle="Make FlexBank comfortable for you." backTo={bankingReturnRoute(returnTo)}>
@@ -142,6 +158,19 @@ export function SettingsScreen() {
         </View>
       </AppCard>
     </View> : null}
+
+    <Section title="Account">
+      <AppButton
+        label="Log out"
+        variant="danger"
+        loading={loggingOut}
+        accessibilityHint="Signs out of this demo account and returns to the login screen"
+        onPress={() => { void handleLogout(); }}
+      />
+      {logoutError ? <View accessibilityRole="alert">
+        <AppText role="caption" color="danger">{logoutError}</AppText>
+      </View> : null}
+    </Section>
     <View accessibilityLiveRegion="polite">{status ? <AppText role="caption" color="textSecondary">{status}</AppText> : null}</View>
   </BankingScreen>;
 }
