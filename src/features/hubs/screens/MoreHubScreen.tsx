@@ -15,6 +15,8 @@ type MoreRoute =
   | '/settings'
   | '/customize'
   | '/purposes'
+  | '/quick-actions'
+  | '/calendar'
   | '/concierge'
   | '/human-assistance';
 
@@ -51,6 +53,23 @@ const GROUPS: MoreGroup[] = [
         description: 'Choose what we show first on your home screen.',
         icon: 'goal',
         route: '/purposes',
+      },
+      {
+        title: 'Quick actions',
+        description: 'Choose and order the shortcuts at the top of Home.',
+        icon: 'goal',
+        route: '/quick-actions',
+      },
+    ],
+  },
+  {
+    heading: 'Money tools',
+    items: [
+      {
+        title: 'Financial calendar',
+        description: 'Bills, income and savings by date (reminders only).',
+        icon: 'info',
+        route: '/calendar',
       },
     ],
   },

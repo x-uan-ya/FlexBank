@@ -8,6 +8,8 @@ import express, { type NextFunction, type Request, type Response } from 'express
 
 import { createApi } from './api';
 import { loadConfig } from './config';
+import { MemoryFeatureStore, type FeatureStore } from './featureStore';
+import { PostgresFeatureStore } from './postgresFeatureStore';
 import { MemoryStore, type Store } from './store';
 import { SupabaseStore } from './supabaseStore';
 
@@ -21,6 +23,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const storeDriver = process.env.STORE_DRIVER?.trim().toLowerCase();
   let store: Store;
+  let features: FeatureStore;
   let closeStore: (() => Promise<void>) | undefined;
 
   if (storeDriver === 'postgres') {
@@ -35,17 +38,30 @@ async function main(): Promise<void> {
       await postgresStore.close();
       throw err;
     }
+    const postgresFeatures = new PostgresFeatureStore(databaseUrl);
+    try {
+      await postgresFeatures.init();
+    } catch (err) {
+      await postgresFeatures.close();
+      await postgresStore.close();
+      throw err;
+    }
     store = postgresStore;
-    closeStore = () => postgresStore.close();
+    features = postgresFeatures;
+    closeStore = async () => {
+      await postgresFeatures.close();
+      await postgresStore.close();
+    };
     console.log('Data store: PostgreSQL');
   } else {
     const memoryStore = new MemoryStore();
     await memoryStore.init();
     store = memoryStore;
+    features = new MemoryFeatureStore();
     console.log('Data store: in-memory demo');
   }
 
-  const api = createApi({ store, config });
+  const api = createApi({ store, config, features });
 
   const app = express();
   app.disable('x-powered-by');

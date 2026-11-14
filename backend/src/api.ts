@@ -17,6 +17,8 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 
 import { hashPassword, signToken, verifyAgainstDummy, verifyPassword, verifyToken } from './auth';
 import type { Config } from './config';
+import { createFeatureHandlers } from './featureHandlers';
+import { MemoryFeatureStore, type FeatureStore } from './featureStore';
 import { RateLimiter } from './limiter';
 import type { Store } from './store';
 import {
@@ -56,6 +58,8 @@ export interface ApiResponse {
 export interface ApiDeps {
   store: Store;
   config: Config;
+  /** Where quick actions and calendar events are kept. Defaults to in-memory. */
+  features?: FeatureStore;
 }
 
 export interface Api {
@@ -63,9 +67,11 @@ export interface Api {
 }
 
 type Json = Record<string, unknown>;
-type Method = 'GET' | 'POST' | 'PUT';
+type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface Ctx {
   req: ApiRequest;
+  /** Values taken from ":name" parts of the route path, for example "/api/calendar/events/:id". */
+  params: Record<string, string>;
 }
 interface PublicRoute {
   method: Method;
@@ -96,6 +102,33 @@ function asObject(value: unknown): Json {
 
 function oneOf<T extends string>(allowed: readonly T[], value: unknown): T | undefined {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
+
+/** Matches "/api/calendar/events/:id" against a real path and returns the ":id" values, or undefined. */
+function matchPath(pattern: string, path: string): Record<string, string> | undefined {
+  const want = pattern.split('/');
+  const have = path.split('/');
+  if (want.length !== have.length) {
+    return undefined;
+  }
+  const params: Record<string, string> = {};
+  for (let i = 0; i < want.length; i += 1) {
+    const expected = want[i] ?? '';
+    const actual = have[i] ?? '';
+    if (expected.startsWith(':')) {
+      if (!actual) {
+        return undefined;
+      }
+      try {
+        params[expected.slice(1)] = decodeURIComponent(actual);
+      } catch {
+        return undefined;
+      }
+    } else if (expected !== actual) {
+      return undefined;
+    }
+  }
+  return params;
 }
 
 function readPriorities(value: unknown): Priority[] | undefined {
@@ -173,6 +206,8 @@ function safeEqual(a: string, b: string): boolean {
 
 export function createApi(deps: ApiDeps): Api {
   const { store, config } = deps;
+  const features = deps.features ?? new MemoryFeatureStore();
+  const feature = createFeatureHandlers(features);
   const loginLimiter = new RateLimiter(10, 60_000); // 10 tries per email per minute
 
   const session = (user: User): Json => ({
@@ -379,6 +414,21 @@ export function createApi(deps: ApiDeps): Api {
       json(200, { transactions: await store.listTransactions(user.id) }),
     ),
 
+    /* ---------------- Quick actions (home shortcuts; they only open screens) ---------------- */
+
+    authed('GET', '/api/quick-actions', async (_ctx, user) => feature.getQuickActions(user)),
+    authed('PUT', '/api/quick-actions', async ({ req }, user) => feature.putQuickActions(user, req.body)),
+    authed('DELETE', '/api/quick-actions', async (_ctx, user) => feature.resetQuickActions(user)),
+
+    /* ---------------- Financial calendar (reminders only; nothing here moves money) ---------------- */
+
+    authed('GET', '/api/calendar', async ({ req }, user) => feature.getCalendar(user, req.query)),
+    authed('POST', '/api/calendar/events', async ({ req }, user) => feature.createEvent(user, req.body)),
+    authed('PUT', '/api/calendar/events/:id', async ({ req, params }, user) =>
+      feature.updateEvent(user, params.id, req.body),
+    ),
+    authed('DELETE', '/api/calendar/events/:id', async ({ params }, user) => feature.deleteEvent(user, params.id)),
+
     /* ---------------- Demo control (needs DEMO_KEY) ---------------- */
 
     pub('POST', '/api/demo/reset', async ({ req }) => {
@@ -387,6 +437,7 @@ export function createApi(deps: ApiDeps): Api {
         return blocked;
       }
       await store.reset();
+      await features.reset();
       return json(200, { ok: true });
     }),
   ];
@@ -395,22 +446,26 @@ export function createApi(deps: ApiDeps): Api {
     async handle(req) {
       try {
         const path = req.path.length > 1 ? req.path.replace(/\/+$/, '') : req.path;
-        const matching = routes.filter((r) => r.path === path);
+        const matching = routes.flatMap((route) => {
+          const params = matchPath(route.path, path);
+          return params ? [{ route, params }] : [];
+        });
         if (matching.length === 0) {
           return error(404, NOT_FOUND);
         }
-        const route = matching.find((r) => r.method === req.method);
-        if (!route) {
+        const hit = matching.find((m) => m.route.method === req.method);
+        if (!hit) {
           return error(405, 'That method is not allowed here.');
         }
+        const { route, params } = hit;
         if (route.auth) {
           const user = await authenticate(req);
           if (!user) {
             return error(401, 'Please log in to continue.');
           }
-          return await route.handler({ req }, user);
+          return await route.handler({ req, params }, user);
         }
-        return await route.handler({ req });
+        return await route.handler({ req, params });
       } catch (err) {
         console.error('[api] unexpected error:', err instanceof Error ? err.message : err);
         return error(500, SERVER_ERROR);
