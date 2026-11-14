@@ -15,8 +15,17 @@
  */
 
 import type { ConciergeContract, ConciergeResponse } from '@/types/contracts';
-import { LANGUAGE_LABELS, type Language } from '@/types/preferences';
+import type { FinancialContextInput } from '@/features/financial-context';
+import {
+  LANGUAGE_LABELS,
+  type BankingPurpose,
+  type Language,
+} from '@/types/preferences';
 
+import {
+  answerContextualFinancialQuestion,
+  redactFinancialFigures,
+} from './contextualFinance';
 import { tryAiChat, tryAiProvider, type ChatTurn } from './provider/aiProvider';
 
 /** Plain-language explanations for known transfer contexts. */
@@ -252,6 +261,12 @@ export interface ChatMessage {
   text: string;
 }
 
+export type ConciergeAnswerSource = 'prepared-financial-context' | 'prepared-general' | 'live-ai';
+
+export interface ConciergeChatResponse extends ConciergeResponse {
+  source: ConciergeAnswerSource;
+}
+
 /** Offline safety guard (mirrors server/src/safety.ts). */
 const CHAT_CREDENTIAL = /\b(password|passcode|otp|one[-\s]?time|pin|cvv|card number|account number|login|credential)\b/i;
 const CHAT_TRANSACTION = /\b(confirm|approve|authorise|authorize|execute|send|transfer|pay|cancel|move)\b[^.?!]{0,40}\b(my|the|this)\b[^.?!]{0,20}\b(transfer|payment|transaction|money|funds|fds?|fixed deposit)\b/i;
@@ -346,4 +361,97 @@ export async function chat(
   }
 
   return fallback(offlineChatAnswer(trimmed));
+}
+
+/**
+ * Account-aware entry point used by the existing chat UI. Financial questions
+ * are resolved locally before the general chat path can reach the AI proxy.
+ */
+export async function chatWithFinancialContext(
+  question: string,
+  history: ChatMessage[] = [],
+  options: {
+    language?: Language;
+    guidanceLevel: ConciergeGuidance;
+    bankingPurposes: BankingPurpose[];
+    financialContext: FinancialContextInput | null;
+    balanceHidden: boolean;
+    selectedInsightId?: string | null;
+    /** Per-session, explicit consent for a standalone general question only. */
+    allowRemoteAi?: boolean;
+    /** Blocks remote use after any record-derived turn, even if history is redacted. */
+    conversationContainsFinancialContext?: boolean;
+  },
+): Promise<ConciergeChatResponse> {
+  const trimmed = question.trim();
+  const refusal = offlineRefusal(trimmed);
+  if (refusal) {
+    return protectChatResponse(
+      { ...fallback(refusal), source: 'prepared-general' },
+      options.balanceHidden,
+    );
+  }
+
+  const contextual = answerContextualFinancialQuestion({
+    question: trimmed,
+    context: options.financialContext,
+    bankingPurposes: options.bankingPurposes,
+    guidanceLevel: options.guidanceLevel,
+    balanceHidden: options.balanceHidden,
+    selectedInsightId: options.selectedInsightId,
+  });
+  if (contextual) {
+    return protectChatResponse({
+      text: contextual.text,
+      usedFallback: true,
+      source: contextual.source,
+    }, options.balanceHidden);
+  }
+
+  // Fail closed. Keyword routing is not an authorisation boundary: without an
+  // explicit opt-in, or when any prior turn exists, answer locally. Remote AI
+  // is limited to a strict allowlist of standalone general-education asks and
+  // receives no history or financial context.
+  if (
+    !options.allowRemoteAi ||
+    options.conversationContainsFinancialContext === true ||
+    history.length > 0 ||
+    !isSafeStandaloneGeneralQuestion(trimmed)
+  ) {
+    return protectChatResponse({
+      ...fallback(offlineChatAnswer(trimmed)),
+      source: 'prepared-general',
+    }, options.balanceHidden);
+  }
+
+  const response = await chat(trimmed, [], {
+    language: options.language,
+    guidanceLevel: options.guidanceLevel,
+  });
+  return protectChatResponse({
+    ...response,
+    source: response.usedFallback ? 'prepared-general' : 'live-ai',
+  }, options.balanceHidden);
+}
+
+const REMOTE_GENERAL_QUESTION = /^(?:what (?:is|are)|how (?:does|do)|explain|define)\s+(?:(?:a|an|the)\s+)?(?:fixed deposits?|time deposits?|bonds?|bond coupons?|coupons?|bond maturity|maturity|interest rates?|per annum|apy|aer|paynow)(?:\s+work)?[?.!]*$/i;
+const REMOTE_PRIVATE_SIGNAL = /\b(i|my|mine|me|myself|our|ours|us|personal|private|account|balance|transaction|spending|expense|income|salary|goal|portfolio|holding|subscription|recipient)\b|\d|S\$|\$/i;
+
+/** Conservative allowlist; false means use a prepared local answer. */
+export function isSafeStandaloneGeneralQuestion(question: string): boolean {
+  const trimmed = question.trim();
+  return trimmed.length > 0 &&
+    trimmed.length <= 240 &&
+    REMOTE_GENERAL_QUESTION.test(trimmed) &&
+    !REMOTE_PRIVATE_SIGNAL.test(trimmed) &&
+    offlineRefusal(trimmed) === null;
+}
+
+function protectChatResponse(
+  response: ConciergeChatResponse,
+  balanceHidden: boolean,
+): ConciergeChatResponse {
+  return balanceHidden
+    ? { ...response, text: redactFinancialFigures(response.text) }
+    : response;
 }
