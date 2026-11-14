@@ -10,6 +10,8 @@ import { useTheme } from '@/theme';
 import type { HomeWidgetType } from '@/types/home';
 import { formatMoney } from '@/utils';
 
+import { QuickActionsBar } from '@/features/quickActions/components/QuickActionsBar';
+
 import { HomeIcon } from '../components/HomeIcon';
 import { WidgetRenderer } from '../components/WidgetRenderer';
 import { PurposeWidgets } from '../components/PurposeWidgets';
@@ -24,18 +26,12 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { firstName } = useCurrentUser();
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [detail, setDetail] = useState<HomeDetail | null>(null);
   const account = MOCK_ACCOUNTS[0];
   const enlarged = theme.mode !== 'standard';
   const narrow = width < 375 || enlarged;
-  const contentWidth = Math.min(560, width - theme.spacing.md * 2);
-  // Allow Scan & Pay to wrap, while leaving room for the longest single word.
-  // System font scaling can require the row layout even on a wider phone.
-  const minActionWidth = (theme.typography.label.fontSize ?? 14) * fontScale * 5
-    + theme.spacing.sm * 2 + (theme.clarity ? 4 : 2);
-  const actionsInRow = contentWidth >= minActionWidth * 3 + theme.spacing.sm * 2;
   const visibleShortcuts = [...useHomeLayout()]
     .sort((a, b) => a.position - b.position)
     .filter((widget) => widget.visible)
@@ -116,30 +112,8 @@ export function HomeScreen() {
             </View>
           </AppCard> : null}
 
-          <View style={{ gap: theme.spacing.sm }}>
-            <View style={{ flexDirection: actionsInRow ? 'row' : 'column', gap: theme.spacing.sm }}>
-              {([
-                { label: 'PayNow', icon: 'paynow', onPress: () => router.push('/paynow'), primary: true },
-                { label: 'Scan & Pay', icon: 'scan', onPress: () => router.push('/scan'), hint: 'Preview only' },
-                { label: 'Transfer', icon: 'transfer', onPress: () => setDetail('transfer'), hint: 'PayNow demo only' },
-              ] as const).map((action) => <Pressable key={action.label} accessibilityRole="button"
-                accessibilityLabel={`${action.label}${'hint' in action ? `, ${action.hint}` : ''}`}
-                onPress={action.onPress} style={({ pressed }) => ({ flex: actionsInRow ? 1 : undefined,
-                  minWidth: 0, opacity: pressed ? 0.75 : 1 })}>
-                <AppCard style={{ flex: 1, minHeight: actionsInRow ? 96 : 56,
-                  flexDirection: actionsInRow ? 'column' : 'row', alignItems: 'center',
-                  justifyContent: actionsInRow ? 'center' : 'flex-start', gap: theme.spacing.sm,
-                  padding: theme.spacing.sm, borderRadius: theme.radius.lg,
-                  ...('primary' in action ? { backgroundColor: theme.colors.primary, borderColor: theme.colors.primaryStrong } : {}),
-                }}>
-                  <HomeIcon name={action.icon} size={28} color={'primary' in action ? theme.colors.onPrimary : theme.colors.primary} />
-                  <AppText role="label" center={actionsInRow} style={{ flexShrink: 1,
-                    color: 'primary' in action ? theme.colors.onPrimary : theme.colors.textPrimary }}>{action.label}</AppText>
-                </AppCard>
-              </Pressable>)}
-            </View>
-            <AppText role="caption" color="textSecondary">Scan &amp; Pay: preview only. Transfers: PayNow demo only.</AppText>
-          </View>
+          {/* Customisable quick actions (the customer chooses and orders them; they only open screens). */}
+          <QuickActionsBar />
 
           <PurposeWidgets balanceHidden={balanceHidden} />
           <Pressable accessibilityRole="button" accessibilityLabel="Made for you. Personalise your home dashboard"

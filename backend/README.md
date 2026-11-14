@@ -60,6 +60,10 @@ Send `Authorization: Bearer <token>` on everything except health, register, logi
 | POST | /api/transfers/validate | `{recipientId, amount}` returns `{valid, messages}` |
 | POST | /api/transfers/confirm | `{recipientId, amount, requestId}` the customer pressed Confirm. Make a NEW `requestId` for each transfer (8 to 64 letters, numbers, `-` or `_`) and reuse it only when retrying the same press |
 | GET | /api/transactions | History, newest first |
+| GET / PUT / DELETE | /api/quick-actions | The customer's home shortcuts. PUT `{actionIds: [...]}` (1 to 4 ids). DELETE goes back to the suggested ones |
+| GET | /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD | Calendar events (repeats expanded) for up to 62 days, plus a bills / income / savings summary |
+| POST | /api/calendar/events | Add an event `{title, kind, date, amount?, repeat?, note?}` |
+| PUT / DELETE | /api/calendar/events/:id | Change or remove one of the customer's own events |
 | POST | /api/demo/reset | Put the demo data back to the start (needs the `x-demo-key` header) |
 
 `preferences` looks like:
