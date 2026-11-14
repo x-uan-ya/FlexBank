@@ -30,8 +30,7 @@ export function privacySafeInsight(
   return {
     ...insight,
     title: privateTitle(insight.type),
-    explanation:
-      'Financial amounts are hidden. Use the existing balance visibility control to view this insight.',
+    explanation: privateExplanation(insight.type),
   };
 }
 
@@ -70,7 +69,18 @@ function containsFinancialAmounts(type: PrioritisedInsight['type']): boolean {
 }
 
 function privateTitle(type: PrioritisedInsight['type']): string {
-  if (type === 'goal-progress' || type === 'goal-coaching') return 'Savings goal insight';
+  if (type === 'goal-progress') return 'Savings goal progress';
+  if (type === 'goal-coaching') return 'Savings contribution planning';
   if (type === 'recurring-expense') return 'Recurring expense insight';
   return 'Spending insight';
+}
+
+function privateExplanation(type: PrioritisedInsight['type']): string {
+  if (type === 'goal-progress') {
+    return 'Your saved goal has a progress update. Amounts and other goal details are hidden.';
+  }
+  if (type === 'goal-coaching') {
+    return 'Your saved goal has contribution guidance. Amounts and other goal details are hidden.';
+  }
+  return 'Financial amounts are hidden. Use the existing balance visibility control to view this insight.';
 }
