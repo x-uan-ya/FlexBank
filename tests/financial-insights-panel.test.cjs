@@ -53,11 +53,41 @@ test('balance privacy removes amount-bearing visible and accessible copy', () =>
   const original = selectPanelInsights(context, ['saving'], [], 2)[0];
   const privateInsight = privacySafeInsight(original, true);
   assert.notStrictEqual(privateInsight, original);
-  assert.equal(privateInsight.title, 'Savings goal insight');
+  assert.equal(privateInsight.title, 'Savings goal progress');
   assert.doesNotMatch(`${privateInsight.title} ${privateInsight.explanation}`, /S\$|1800|4000|45%/);
-  assert.match(privateInsight.explanation, /amounts are hidden/i);
+  assert.match(privateInsight.explanation, /amounts.*hidden/i);
   assert.match(original.title, /45%/);
   assert.strictEqual(privacySafeInsight(original, false), original);
+});
+
+test('hidden goal progress and coaching remain distinct without exposing goal details', () => {
+  const goalInsights = selectPanelInsights(context, ['saving'], [], 3)
+    .filter(insight => insight.type === 'goal-progress' || insight.type === 'goal-coaching');
+  const hiddenByType = Object.fromEntries(goalInsights.map(insight => [
+    insight.type,
+    privacySafeInsight(insight, true),
+  ]));
+  const progress = hiddenByType['goal-progress'];
+  const coaching = hiddenByType['goal-coaching'];
+
+  assert.ok(progress);
+  assert.ok(coaching);
+  assert.equal(progress.title, 'Savings goal progress');
+  assert.equal(coaching.title, 'Savings contribution planning');
+  assert.notEqual(progress.explanation, coaching.explanation);
+
+  // This is the same title/explanation composition used by the card's accessibilityLabel.
+  const accessibleCopy = [progress, coaching]
+    .map(insight => `${insight.title}. ${insight.explanation}`)
+    .join(' ');
+  assert.doesNotMatch(
+    accessibleCopy,
+    /Japan trip demo|2027-05-14|S\$|\b(?:4000|1800|400)\b|45%/i,
+  );
+  assert.match(progress.explanation, /progress update/i);
+  assert.match(coaching.explanation, /contribution guidance/i);
+  assert.match(progress.priority.reason, /selected Saving/i);
+  assert.match(coaching.priority.reason, /selected Saving/i);
 });
 
 test('optional actions are restricted to existing non-transaction routes', () => {

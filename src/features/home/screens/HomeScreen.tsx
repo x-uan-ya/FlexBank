@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton, AppCard, AppText } from '@/components';
 import { MOCK_ACCOUNTS, MOCK_SPENDING } from '@/data';
+import { PersonalisedInsightsPanel } from '@/features/financial-context/ui';
 import { useHomeLayout } from '@/state';
 import { useTheme } from '@/theme';
 import type { HomeWidgetType } from '@/types/home';
@@ -142,6 +143,7 @@ export function HomeScreen() {
           </View>
 
           <PurposeWidgets balanceHidden={balanceHidden} />
+          <PersonalisedInsightsPanel balanceHidden={balanceHidden} maximumInsights={3} />
           <Pressable accessibilityRole="button" accessibilityLabel="Made for you. Personalise your home dashboard"
             onPress={() => router.push('/customize')} style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}>
             <AppCard style={{ borderRadius: theme.radius.xl }}>

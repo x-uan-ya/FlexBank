@@ -208,12 +208,16 @@ export function PlanScreen() {
         <AppCard>
           <View style={{ gap: theme.spacing.md }}>
             <AppInput label="Goal name" placeholder="e.g. Holiday fund" value={name}
+              focusBorderColor={theme.colors.primaryStrong}
               onChangeText={(t) => { setName(t); setFormError(''); }} />
             <AppInput label="Target amount (S$)" placeholder="5000" keyboardType="decimal-pad" value={targetText}
+              focusBorderColor={theme.colors.primaryStrong}
               onChangeText={(t) => { setTargetText(t); setFormError(''); }} />
             <AppInput label="Saved so far (S$)" placeholder="0" keyboardType="decimal-pad" value={savedText}
+              focusBorderColor={theme.colors.primaryStrong}
               onChangeText={(t) => { setSavedText(t); setFormError(''); }} />
             <AppInput label="Monthly contribution (S$)" placeholder="200" keyboardType="decimal-pad" value={monthlyText}
+              focusBorderColor={theme.colors.primaryStrong}
               onChangeText={(t) => { setMonthlyText(t); setFormError(''); }} />
             {draftMonths !== null ? (
               <AppText role="caption" color="textSecondary">
