@@ -8,6 +8,7 @@ optional translation, and a safe AI adapter that never confirms a transfer.
 | Path | Role |
 |------|------|
 | `concierge.ts` | Public `ConciergeContract` (`explain`, `simplify`, `translate`) |
+| `contextualFinance.ts` | Pure local resolver for authorised financial-context insights |
 | `provider/aiProvider.ts` | Optional live-AI client (off by default, timeout + validation) |
 | `components/ConciergeHelpPanel.tsx` | Embeddable help panel for transfer screens |
 | `screens/ConciergeScreen.tsx` | Full help screen at `/concierge` |
@@ -28,12 +29,38 @@ optional translation, and a safe AI adapter that never confirms a transfer.
   “AI-assisted explanation”. Never claims AI when the fallback ran.
 - **Safety.** No import of PayNow confirm APIs. Help cannot edit recipient,
   amount, or send money. Transfer state is preserved when opening help.
+- **Contextual finance.** Spending, recurring-expense, Plan goal and synthetic
+  maturity questions reuse the financial-context engine. These prepared answers
+  are local and deterministic; financial records never enter the optional proxy.
+- **Ownership and privacy.** Only user-keyed Plan goals are eligible
+  for account-specific insights. App-wide savings pockets and saved
+  investments remain excluded because ownership cannot be verified.
+  Contextual Concierge chat starts with financial amounts hidden.
+  Switching users resets the chat session, and previously revealed
+  financial information is removed when privacy is re-enabled.
+  Synthetic spending and investment examples are explicitly labelled.
+- **Remote AI consent and privacy.** The contextual Concierge chat
+  requires explicit per-session opt-in before eligible standalone
+  general banking-education questions can reach the optional AI proxy.
+  Personal financial records, contextual questions, numeric details
+  and chat history are excluded from remote requests.
+  Account-specific financial explanations are generated locally.
+
+- **Legacy AI helpers.** The existing explain(), simplify(), and
+  translate() methods retain their optional AI-provider functionality.
+  These methods do not use the new chat-specific consent control.
+  User-specific financial information must not be supplied to these
+  legacy helper methods.
 
 ## Integration (already wired)
 
 - `ReviewScreen`, `AmountScreen`, `RecipientScreen` open `ConciergeHelpPanel`
   **inline** so the customer does not leave the step.
-- Full screen remains at `/concierge` (optional `?context=paynow-review`).
+- Full Concierge screen remains available at `/concierge`.
+- Optional `insightId` navigation allows the Concierge to explain
+  a selected financial insight. The insight is resolved against
+  the currently authenticated user's authorised context.
+- Unknown or stale insight IDs cannot reveal another user's records.
 - Call from code:
 
 ```ts
@@ -60,8 +87,17 @@ behind the same contract.
 1. Implement a real provider call inside a copy of `server/concierge-proxy.example.mjs`.
 2. Set **server** env: `CONCIERGE_AI_API_KEY=...` (never commit).
 3. Run the server (example: `node server/concierge-proxy.example.mjs`).
-4. Start Expo with:
-   `EXPO_PUBLIC_CONCIERGE_AI_URL=http://localhost:8787/concierge npx expo start`
+4. Start Expo with the optional AI endpoint configured.
+
+   Windows PowerShell:
+
+   ```powershell
+   $env:EXPO_PUBLIC_CONCIERGE_AI_URL="http://localhost:8787/concierge"
+   npx expo start
+   ```
+
+   Without this environment variable, FlexBank continues using
+   prepared offline responses.
 5. Without the URL, the app stays fully offline.
 
 This repository does **not** ship a live key and was **not** tested against a
@@ -83,10 +119,12 @@ paid provider.
 
 - Prepared translations: English + Mandarin only.
 - Live AI requires your own backend and key; not enabled in the default demo.
-- No unit test runner is configured in `package.json` (only `npm run typecheck`).
+- Contextual answers are currently prepared in English; the existing general
+  Concierge translation contract remains unchanged.
 
-## Typecheck
+## Validation
 
 ```bash
 npm run typecheck
+npm test
 ```

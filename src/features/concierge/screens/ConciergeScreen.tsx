@@ -8,11 +8,19 @@ import { useTheme } from '@/theme';
 import { bankingReturnRoute } from '@/utils/bankingNavigation';
 import { concierge } from '../concierge';
 import { ConciergeChat } from '../components/ConciergeChat';
+import { useAuthState } from '@/state';
 
 /** Prepared demo explanations; the existing service contract stays read-only. */
 export function ConciergeScreen() {
   const theme = useTheme();
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { status, user } = useAuthState();
+
+  const chatSessionKey =
+    status === 'signedIn'
+      ? user?.id ?? 'signed-out'
+      : 'signed-out';
+
+  const { returnTo, insightId } = useLocalSearchParams<{ returnTo?: string; insightId?: string }>();
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
@@ -37,7 +45,9 @@ export function ConciergeScreen() {
       <View style={{ gap: theme.spacing.sm }}>
         <AppText role="subheading">Understand your transfer review</AppText>
         <AppText color="textSecondary">Get a simple explanation of what to check. You stay in control of every banking action.</AppText>
-        <AppText role="caption" color="textSecondary">This demo uses prepared explanations. Live AI is not connected.</AppText>
+        <AppText role="caption" color="textSecondary">
+          Prepared transfer help is always available. If the optional live AI proxy is configured, no recipient, amount or transfer record is included in this request.
+        </AppText>
       </View>
     </AppCard>
     <AppButton label="Explain the review screen" onPress={explainReview} loading={loading}
@@ -48,14 +58,20 @@ export function ConciergeScreen() {
       <View accessibilityLiveRegion="polite" style={{ gap: theme.spacing.sm }}>
         <AppText role="subheading" accessibilityRole="header">Your explanation</AppText>
         <AppText>{answer}</AppText>
-        {usedFallback ? <AppText role="caption" color="textSecondary">Prepared demo explanation.</AppText> : null}
+        <AppText role="caption" color="textSecondary">
+          {usedFallback ? 'Prepared demo explanation · No AI used.' : 'Live AI-assisted general explanation.'}
+        </AppText>
       </View>
     </AppCard> : null}
 
     {/* Multi-turn banking Q&A. Live AI when the proxy is configured; otherwise
         a deterministic offline responder. Never moves money. */}
-    <ConciergeChat />
-
+    <ConciergeChat
+      key={chatSessionKey}
+      selectedInsightId={
+        typeof insightId === 'string' ? insightId : null
+      }
+    />
     <AppText role="caption" color="textSecondary">Concierge does not change recipients, amounts or review requirements, and never confirms a transfer.</AppText>
   </BankingScreen>;
 }
